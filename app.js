@@ -90,10 +90,10 @@ $('#presentation-rows').onclick=e=>{const edit=e.target.closest('[data-edit]'),d
 $('#conference-select').onchange=e=>{state.active=e.target.value;selectedGift='';resetEntry();persist();render();};
 
 function addTier(t={min:0,gift:'',value:0,exclusive:false}){const row=document.createElement('div');row.className='tier-row';row.innerHTML=`<div class="tier-threshold"><select aria-label="Điều kiện"><option value="inclusive">Từ ≥</option><option value="exclusive" ${t.exclusive?'selected':''}>Trên ></option></select><input class="tier-min" aria-label="Ngưỡng phí đầu tư" inputmode="numeric" required value="${fmt(t.min)}"></div><input class="tier-gift" aria-label="Tên quà tặng" placeholder="Tên quà tặng" required maxlength="300" value="${esc(t.gift)}"><input class="tier-value" aria-label="Giá trị quà tặng" inputmode="numeric" required value="${fmt(t.value)}"><button type="button" aria-label="Xóa mức quà">×</button>`;row.querySelector('button').onclick=()=>row.remove();row.querySelectorAll('.tier-min,.tier-value').forEach(el=>el.oninput=()=>{const n=number(el.value);el.value=el.value?fmt(n):'';});$('#tier-rows').append(row);}
-function openConference(edit=false){eventEditing=edit?current().id:null;const c=edit?current():{name:'',date:new Date().toLocaleDateString('en-CA'),location:'',tiers:defaults()};$('#dialog-title').textContent=edit?'Thiết lập hội nghị':'Tạo hội nghị mới';$('#event-name').value=c.name;$('#event-date').value=c.date;$('#event-location').value=c.location;$('#tier-rows').innerHTML='';c.tiers.forEach(addTier);prepareBackground(c);$('#conference-dialog').showModal();}
+function openConference(edit=false){eventEditing=edit?current().id:null;const c=edit?current():{name:'',date:new Date().toLocaleDateString('en-CA'),location:'',tiers:defaults()};$('#dialog-title').textContent=edit?'Thiết lập hội nghị':'Tạo hội nghị mới';$('#event-name').value=c.name;$('#event-date').value=c.date;$('#event-location').value=c.location;$('#tier-rows').innerHTML='';c.tiers.forEach(addTier);backgroundPresentation.prepare(c);giftPresentation.prepare(c);$('#conference-dialog').showModal();}
 $('#create-conference').onclick=()=>openConference();$('#edit-conference').onclick=()=>openConference(true);$('#add-tier').onclick=()=>addTier();
 document.querySelectorAll('.close-dialog').forEach(b=>b.onclick=()=>b.closest('dialog').close());
-$('#conference-form').onsubmit=async e=>{e.preventDefault();const name=$('#event-name').value.trim(),date=$('#event-date').value,location=$('#event-location').value.trim();const tiers=[...document.querySelectorAll('.tier-row')].map(row=>({min:number(row.querySelector('.tier-min').value),gift:row.querySelector('.tier-gift').value.trim(),value:number(row.querySelector('.tier-value').value),exclusive:row.querySelector('select').value==='exclusive'}));const data={name,date,location,tiers,customers:[]};if(!validConference(data)){toast('Kiểm tra tên hội nghị, ngày, quà tặng và các ngưỡng phí. Mỗi ngưỡng phải khác nhau.');return;}tiers.sort((a,b)=>a.min-b.min);let backgroundId;try{backgroundId=await saveBackgroundDraft();}catch{toast('Không lưu được background. Vui lòng thử lại.');return;}if(eventEditing){Object.assign(current(),{name,date,location,tiers,backgroundId});}else{const c={id:uid(),name,date,location,tiers,backgroundId,customers:[],demo:false};state.conferences.push(c);state.active=c.id;selectedGift='';resetEntry();}const saved=persist();render();$('#conference-dialog').close();if(saved)toast('Đã lưu hội nghị và cập nhật chính sách quà tặng.');};
+$('#conference-form').onsubmit=async e=>{e.preventDefault();const name=$('#event-name').value.trim(),date=$('#event-date').value,location=$('#event-location').value.trim();const tiers=[...document.querySelectorAll('.tier-row')].map(row=>({min:number(row.querySelector('.tier-min').value),gift:row.querySelector('.tier-gift').value.trim(),value:number(row.querySelector('.tier-value').value),exclusive:row.querySelector('select').value==='exclusive'}));const data={name,date,location,tiers,customers:[]};if(!validConference(data)){toast('Kiểm tra tên hội nghị, ngày, quà tặng và các ngưỡng phí. Mỗi ngưỡng phải khác nhau.');return;}tiers.sort((a,b)=>a.min-b.min);let backgroundId,giftImageId;try{backgroundId=await backgroundPresentation.save();giftImageId=await giftPresentation.save();}catch{toast('Không lưu được hình hội nghị. Vui lòng thử lại.');return;}if(eventEditing){Object.assign(current(),{name,date,location,tiers,backgroundId,giftImageId});}else{const c={id:uid(),name,date,location,tiers,backgroundId,giftImageId,customers:[],demo:false};state.conferences.push(c);state.active=c.id;selectedGift='';resetEntry();}const saved=persist();render();$('#conference-dialog').close();if(saved)toast('Đã lưu hội nghị và cập nhật chính sách quà tặng.');};
 function download(content,type,filename){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('#export').onclick=()=>{const c=current(),t=totals();const safe=s=>{const text=String(s);return /^[=+\-@\t\r\n]/.test(text)?"'"+text:text;};const rows=[['Hội nghị',c.name],['Ngày',dateLabel(c.date)],['STT','Khách hàng','Phí đầu tư (VNĐ)','Quà tặng','Giá trị quà (VNĐ)','Tư vấn viên'],...c.customers.map((x,i)=>{const g=giftFor(x.amount);return[i+1,x.name,x.amount,g.gift,g.value,x.advisor];}),['TỔNG',c.customers.length,t.amount,'',t.gifts,'']];download('\ufeff'+rows.map(row=>row.map(x=>'"'+safe(x).replace(/"/g,'""')+'"').join(',')).join('\r\n'),'text/csv;charset=utf-8',`dang-ky-hoi-nghi-${c.date}.csv`);toast('Đã xuất tệp CSV — mở được bằng Excel.');};
 $('#download-backup').onclick=()=>download(JSON.stringify({version:1,conferences:state.conferences},null,2),'application/json',`hoi-ngo-sao-luu-${new Date().toISOString().slice(0,10)}.json`);
@@ -105,7 +105,6 @@ window.addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{con
 render();if(storageFailed)toast('Không đọc được dữ liệu đã lưu. Đang hiển thị dữ liệu minh họa.');
 
 // Background images are stored separately; each conference references its own image.
-let backgroundUrl='',backgroundOwnsFullscreen=false,backgroundDraft=null,backgroundDraftId=null,previewUrl='',backgroundVersion=0;
 const backgroundDB=new Promise((resolve,reject)=>{
  const request=indexedDB.open('hoi-ngo-background',1);
  request.onupgradeneeded=()=>request.result.createObjectStore('images');
@@ -114,11 +113,15 @@ const backgroundDB=new Promise((resolve,reject)=>{
 backgroundDB.catch(()=>{});
 async function readBackground(key){if(!key)return null;const db=await backgroundDB;return new Promise((resolve,reject)=>{const r=db.transaction('images').objectStore('images').get(key);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 async function imageUrl(file){const url=URL.createObjectURL(file),probe=new Image();probe.src=url;try{await probe.decode();return url;}catch{URL.revokeObjectURL(url);throw Error('image');}}
-function updateBackgroundPreview(url){if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=url;$('#background-preview').hidden=!url;if(url)$('#background-preview').src=url;else $('#background-preview').removeAttribute('src');}
+// Both presentation buttons use the same upload, storage and fullscreen behavior.
+function createImagePresentation(kind,field,label){
+const element=suffix=>$('#'+kind+'-'+suffix);
+let backgroundUrl='',backgroundOwnsFullscreen=false,backgroundDraft=null,backgroundDraftId=null,previewUrl='',backgroundVersion=0;
+function updateBackgroundPreview(url){if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=url;element('preview').hidden=!url;if(url)element('preview').src=url;else element('preview').removeAttribute('src');}
 async function prepareBackground(c){
- const version=++backgroundVersion;backgroundDraft=null;backgroundDraftId=c.backgroundId||null;
- $('#background-upload').value='';updateBackgroundPreview('');$('#background-status').textContent=backgroundDraftId?'Đang tải hình…':'Chưa chọn hình.';
- try{const file=await readBackground(backgroundDraftId);if(version!==backgroundVersion)return;if(file){const url=await imageUrl(file);if(version!==backgroundVersion){URL.revokeObjectURL(url);return;}updateBackgroundPreview(url);$('#background-status').textContent='Background đã lưu của hội nghị.';}else if(backgroundDraftId)$('#background-status').textContent='Không tìm thấy hình trên thiết bị này. Vui lòng chọn lại.';}catch{if(version===backgroundVersion)$('#background-status').textContent='Không đọc được hình đã lưu. Vui lòng chọn lại.';}
+ const version=++backgroundVersion;backgroundDraft=null;backgroundDraftId=c[field]||null;
+ element('upload').value='';updateBackgroundPreview('');element('status').textContent=backgroundDraftId?'Đang tải hình…':'Chưa chọn hình.';
+ try{const file=await readBackground(backgroundDraftId);if(version!==backgroundVersion)return;if(file){const url=await imageUrl(file);if(version!==backgroundVersion){URL.revokeObjectURL(url);return;}updateBackgroundPreview(url);element('status').textContent=label+' đã lưu của hội nghị.';}else if(backgroundDraftId)element('status').textContent='Không tìm thấy hình trên thiết bị này. Vui lòng chọn lại.';}catch{if(version===backgroundVersion)element('status').textContent='Không đọc được hình đã lưu. Vui lòng chọn lại.';}
 }
 async function saveBackgroundDraft(){
  if(!backgroundDraft)return backgroundDraftId;
@@ -126,25 +129,29 @@ async function saveBackgroundDraft(){
  await new Promise((resolve,reject)=>{const tx=db.transaction('images','readwrite');tx.objectStore('images').put(file,id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
  return id;
 }
-$('#background-upload').onchange=async e=>{
+element('upload').onchange=async e=>{
  const file=e.target.files[0];if(!file)return;const version=++backgroundVersion;
  const submit=$('#conference-form button[type="submit"]');submit.disabled=true;
- try{const url=await imageUrl(file);if(version!==backgroundVersion){URL.revokeObjectURL(url);return;}backgroundDraft=file;updateBackgroundPreview(url);$('#background-status').textContent=file.name+' — Bấm Lưu hội nghị để lưu hình.';}catch{toast('Không đọc được hình. Vui lòng chọn tệp ảnh hợp lệ.');e.target.value='';}finally{submit.disabled=false;}
+ try{const url=await imageUrl(file);if(version!==backgroundVersion){URL.revokeObjectURL(url);return;}backgroundDraft=file;updateBackgroundPreview(url);element('status').textContent=file.name+' — Bấm Lưu hội nghị để lưu hình.';}catch{toast('Không đọc được hình. Vui lòng chọn tệp ảnh hợp lệ.');e.target.value='';}finally{submit.disabled=false;}
 };
 async function openBackground(){
- const dialog=$('#background-dialog');
+ const dialog=element('dialog');
  // Enter fullscreen first: the dialog must be added to the top layer last.
  if(!document.fullscreenElement&&document.documentElement.requestFullscreen){
   try{await document.documentElement.requestFullscreen();backgroundOwnsFullscreen=true;}catch{backgroundOwnsFullscreen=false;}
  }
  if(!dialog.open)dialog.showModal();
 }
-$('#show-background').onclick=async()=>{
- const c=current();if(!c.backgroundId){toast('Hãy thêm background trong mục Thiết lập & quà tặng.');return;}
- try{const file=await readBackground(c.backgroundId);if(!file)throw Error();const url=await imageUrl(file);if(current().id!==c.id){URL.revokeObjectURL(url);return;}if(backgroundUrl)URL.revokeObjectURL(backgroundUrl);backgroundUrl=url;$('#background-image').src=url;await openBackground();}catch{toast('Không đọc được background. Hãy chọn lại hình trong Thiết lập & quà tặng.');}
+$('#show-'+kind).onclick=async()=>{
+ const c=current();if(!c[field]){toast('Hãy thêm '+label+' trong mục Thiết lập & quà tặng.');return;}
+ try{const file=await readBackground(c[field]);if(!file)throw Error();const url=await imageUrl(file);if(current().id!==c.id){URL.revokeObjectURL(url);return;}if(backgroundUrl)URL.revokeObjectURL(backgroundUrl);backgroundUrl=url;element('image').src=url;await openBackground();}catch{toast('Không đọc được '+label+'. Hãy chọn lại hình trong Thiết lập & quà tặng.');}
 };
-$('#close-background').onclick=()=>$('#background-dialog').close();
-$('#background-dialog').addEventListener('close',()=>{if(backgroundOwnsFullscreen&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});backgroundOwnsFullscreen=false;$('#show-background').focus();});
-document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&backgroundOwnsFullscreen){backgroundOwnsFullscreen=false;if($('#background-dialog').open)$('#background-dialog').close();}});
+$('#close-'+kind).onclick=()=>element('dialog').close();
+element('dialog').addEventListener('close',()=>{if(backgroundOwnsFullscreen&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});backgroundOwnsFullscreen=false;$('#show-'+kind).focus();});
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&backgroundOwnsFullscreen){backgroundOwnsFullscreen=false;if(element('dialog').open)element('dialog').close();}});
+return {prepare:prepareBackground,save:saveBackgroundDraft};
+}
+const backgroundPresentation=createImagePresentation('background','backgroundId','Background');
+const giftPresentation=createImagePresentation('gift','giftImageId','hình Quà');
 // Preserve the previously uploaded global background for the active conference.
 (async()=>{const c=current();try{if(!c.backgroundId&&await readBackground('current')){c.backgroundId='current';persist();}}catch{}})();

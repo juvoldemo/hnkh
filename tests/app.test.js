@@ -94,6 +94,36 @@ test('Direct presentation entry, Enter, thresholds, editing, persistence, backup
  await page.locator('#edit-conference').click();
  await page.locator('#background-preview').waitFor({state:'visible'});
  await page.locator('#conference-dialog .close-dialog').first().click();
+ await page.locator('#edit-conference').click();
+ await page.locator('#gift-upload').setInputFiles('logo.png');
+ await page.locator('#gift-preview').waitFor({state:'visible'});
+ assert.equal(await page.locator('#gift-dialog').isVisible(),false);
+ await page.locator('#conference-form button[type=submit]').click();
+ await page.locator('#show-gift').click();
+ await page.locator('#gift-dialog').waitFor({state:'visible'});
+ assert.equal(await page.locator('#gift-image').evaluate(el=>el.naturalWidth>0),true);
+ assert.equal(await page.evaluate(()=>document.elementFromPoint(innerWidth/2,innerHeight/2)?.id),'gift-image');
+
+ assert.equal(await page.locator('#gift-dialog').evaluate(el=>Math.abs(el.getBoundingClientRect().width-innerWidth)<2),true);
+ await page.locator('#close-gift').click();
+ await page.locator('#gift-dialog').waitFor({state:'hidden'});
+ await page.reload();await page.locator('#toggle-tools').click();
+ await page.locator('#show-gift').click();
+ await page.locator('#gift-dialog').waitFor({state:'visible'});
+ assert.equal(await page.locator('#gift-image').evaluate(el=>el.naturalWidth>0),true);
+ await page.locator('#close-gift').click();
+ const savedGiftConference=await page.locator('#conference-select').inputValue();
+ await page.locator('#create-conference').click();
+ assert.equal(await page.locator('#gift-preview').isVisible(),false);
+ await page.locator('#event-name').fill('Hội nghị không có gift');
+ await page.locator('#event-date').fill('2026-09-20');
+ await page.locator('#conference-form button[type=submit]').click();
+ await page.locator('#show-gift').click();
+ assert.equal(await page.locator('#gift-dialog').isVisible(),false);
+ await page.locator('#conference-select').selectOption(savedGiftConference);
+ await page.locator('#edit-conference').click();
+ await page.locator('#gift-preview').waitFor({state:'visible'});
+ await page.locator('#conference-dialog .close-dialog').first().click();
  assert.deepEqual(errors,[]);
  }finally{if(browser)await browser.close();server.kill();}
 });

@@ -17,7 +17,7 @@ test('Mobile cards, touch controls, sorting and dialogs fit narrow screens',asyn
    assert.equal(await page.locator('.presentation-table').evaluate(el=>el.scrollWidth<=el.clientWidth),true,`Cards fit ${width}px`);
    assert.equal(await page.locator('#customer-name').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=16),true);
    await page.locator('#toggle-tools').click();
-   for(const id of ['conference-select','create-conference','edit-conference','export','header-backup','show-background','present']){
+   for(const id of ['conference-select','create-conference','edit-conference','export','header-backup','show-background','show-gift','present']){
     const box=await page.locator('#'+id).boundingBox();
     assert.ok(box.x>=0&&box.x+box.width<=width&&box.height>=44,`${id} fits ${width}px`);
    }
