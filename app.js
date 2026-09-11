@@ -1,5 +1,7 @@
 const $ = s => document.querySelector(s);
-const KEY = 'hoi-ngo-conferences-v1';
+const KEY = Cloud.storageKey;
+let cloudReady=false, cloudBusy=false;
+const cloudSnapshots=new Map();
 const fmt = n => new Intl.NumberFormat('vi-VN').format(n);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => crypto.randomUUID();
@@ -76,7 +78,7 @@ function toggleGiftReceived(row){
 }
 $('#presentation-rows').onkeydown=e=>{if(e.target.matches('tr[data-customer-id]')&&(e.key==='Enter'||e.key===' ')){e.preventDefault();toggleGiftReceived(e.target);}};
 function toast(message) {$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),3600);}
-function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));$('#save-status').textContent='Đã lưu lúc '+new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});return true;}catch{$('#save-status').textContent='Không thể lưu — hãy tải bản sao lưu';toast('Trình duyệt không thể lưu. Hãy sao lưu dữ liệu ngay.');return false;}}
+function persist(){markCloudChanges();try{localStorage.setItem(KEY,JSON.stringify(state));$('#save-status').textContent=Cloud.user?'Đã lưu trên máy — chờ đồng bộ':'Đã lưu trên máy — đăng nhập để lưu Supabase';if(cloudReady)void syncCloud();return true;}catch{$('#save-status').textContent='Không thể lưu — hãy tải bản sao lưu';toast('Trình duyệt không thể lưu. Hãy sao lưu dữ liệu ngay.');return false;}}
 function dateLabel(date){return new Date(date+'T12:00:00').toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});}
 function totals(){return current().customers.reduce((s,c)=>({amount:s.amount+c.amount,gifts:s.gifts+giftFor(c.amount).value}),{amount:0,gifts:0});}
 function render(){const c=current(),t=totals();$('#presentation-title').textContent=c.name;$('#conference-select').innerHTML=state.conferences.map(e=>`<option value="${esc(e.id)}" ${e.id===c.id?'selected':''}>${esc(e.name)}</option>`).join('');$('#stat-count').innerHTML=fmt(c.customers.length)+' <small>khách hàng</small>';$('#stat-investment').innerHTML=fmt(t.amount)+' <small>VNĐ</small>';$('#stat-gifts').innerHTML=fmt(t.gifts)+' <small>VNĐ</small>';$('#advisors').innerHTML=[...new Set(c.customers.map(x=>x.advisor))].map(a=>`<option value="${esc(a)}"></option>`).join('');renderRows();preview();}
@@ -93,12 +95,12 @@ function addTier(t={min:0,gift:'',value:0,exclusive:false}){const row=document.c
 function openConference(edit=false){eventEditing=edit?current().id:null;const c=edit?current():{name:'',date:new Date().toLocaleDateString('en-CA'),location:'',tiers:defaults()};$('#dialog-title').textContent=edit?'Thiết lập hội nghị':'Tạo hội nghị mới';$('#event-name').value=c.name;$('#event-date').value=c.date;$('#event-location').value=c.location;$('#tier-rows').innerHTML='';c.tiers.forEach(addTier);backgroundPresentation.prepare(c);giftPresentation.prepare(c);$('#conference-dialog').showModal();}
 $('#create-conference').onclick=()=>openConference();$('#edit-conference').onclick=()=>openConference(true);$('#add-tier').onclick=()=>addTier();
 document.querySelectorAll('.close-dialog').forEach(b=>b.onclick=()=>b.closest('dialog').close());
-$('#conference-form').onsubmit=async e=>{e.preventDefault();const name=$('#event-name').value.trim(),date=$('#event-date').value,location=$('#event-location').value.trim();const tiers=[...document.querySelectorAll('.tier-row')].map(row=>({min:number(row.querySelector('.tier-min').value),gift:row.querySelector('.tier-gift').value.trim(),value:number(row.querySelector('.tier-value').value),exclusive:row.querySelector('select').value==='exclusive'}));const data={name,date,location,tiers,customers:[]};if(!validConference(data)){toast('Kiểm tra tên hội nghị, ngày, quà tặng và các ngưỡng phí. Mỗi ngưỡng phải khác nhau.');return;}tiers.sort((a,b)=>a.min-b.min);let backgroundId,giftImageId;try{backgroundId=await backgroundPresentation.save();giftImageId=await giftPresentation.save();}catch{toast('Không lưu được hình hội nghị. Vui lòng thử lại.');return;}if(eventEditing){Object.assign(current(),{name,date,location,tiers,backgroundId,giftImageId});}else{const c={id:uid(),name,date,location,tiers,backgroundId,giftImageId,customers:[],demo:false};state.conferences.push(c);state.active=c.id;selectedGift='';resetEntry();}const saved=persist();render();$('#conference-dialog').close();if(saved)toast('Đã lưu hội nghị và cập nhật chính sách quà tặng.');};
+$('#conference-form').onsubmit=async e=>{e.preventDefault();const name=$('#event-name').value.trim(),date=$('#event-date').value,location=$('#event-location').value.trim();const tiers=[...document.querySelectorAll('.tier-row')].map(row=>({min:number(row.querySelector('.tier-min').value),gift:row.querySelector('.tier-gift').value.trim(),value:number(row.querySelector('.tier-value').value),exclusive:row.querySelector('select').value==='exclusive'}));const data={name,date,location,tiers,customers:[]};if(!validConference(data)){toast('Kiểm tra tên hội nghị, ngày, quà tặng và các ngưỡng phí. Mỗi ngưỡng phải khác nhau.');return;}tiers.sort((a,b)=>a.min-b.min);let backgroundId,giftImageId;try{backgroundId=await backgroundPresentation.save();giftImageId=await giftPresentation.save();}catch{toast('Không lưu được hình hội nghị. Vui lòng thử lại.');return;}if(eventEditing){Object.assign(state.conferences.find(c=>c.id===eventEditing),{name,date,location,tiers,backgroundId,giftImageId});}else{const c={id:uid(),name,date,location,tiers,backgroundId,giftImageId,customers:[],demo:false};state.conferences.push(c);state.active=c.id;selectedGift='';resetEntry();}const saved=persist();render();$('#conference-dialog').close();if(saved)toast('Đã lưu hội nghị và cập nhật chính sách quà tặng.');};
 function download(content,type,filename){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('#export').onclick=()=>{const c=current(),t=totals();const safe=s=>{const text=String(s);return /^[=+\-@\t\r\n]/.test(text)?"'"+text:text;};const rows=[['Hội nghị',c.name],['Ngày',dateLabel(c.date)],['STT','Khách hàng','Phí đầu tư (VNĐ)','Quà tặng','Giá trị quà (VNĐ)','Tư vấn viên'],...c.customers.map((x,i)=>{const g=giftFor(x.amount);return[i+1,x.name,x.amount,g.gift,g.value,x.advisor];}),['TỔNG',c.customers.length,t.amount,'',t.gifts,'']];download('\ufeff'+rows.map(row=>row.map(x=>'"'+safe(x).replace(/"/g,'""')+'"').join(',')).join('\r\n'),'text/csv;charset=utf-8',`dang-ky-hoi-nghi-${c.date}.csv`);toast('Đã xuất tệp CSV — mở được bằng Excel.');};
 $('#download-backup').onclick=()=>download(JSON.stringify({version:1,conferences:state.conferences},null,2),'application/json',`hoi-ngo-sao-luu-${new Date().toISOString().slice(0,10)}.json`);
 $('#header-backup').onclick=()=>$('#backup-dialog').showModal();
-$('#restore').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>20e6)throw Error();const data=JSON.parse(await file.text());if(data.version!==1||!Array.isArray(data.conferences)||!data.conferences.length||!data.conferences.every(validConference))throw Error();const imported=data.conferences.map(c=>({...c,id:uid(),customers:c.customers.map((x,i)=>({...x,id:uid(),created:Number.isFinite(x.created)?x.created:Date.now()+i}))}));state.conferences.push(...imported);state.active=imported[0].id;selectedGift='';const saved=persist();resetEntry();render();$('#backup-dialog').close();if(saved)toast(`Đã khôi phục ${imported.length} hội nghị.`);}catch{toast('Tệp sao lưu không hợp lệ hoặc vượt quá 20 MB.');}e.target.value='';};
+$('#restore').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>20e6)throw Error();const data=JSON.parse(await file.text());if(data.version!==1||!Array.isArray(data.conferences)||!data.conferences.length||!data.conferences.every(validConference))throw Error();const imported=data.conferences.map(c=>({...c,id:uid(),demo:false,_cloud:{revision:0,dirty:true},customers:c.customers.map((x,i)=>({...x,id:uid(),created:Number.isFinite(x.created)?x.created:Date.now()+i}))}));state.conferences.push(...imported);state.active=imported[0].id;selectedGift='';const saved=persist();resetEntry();render();$('#backup-dialog').close();if(saved)toast(`Đã khôi phục ${imported.length} hội nghị.`);}catch{toast('Tệp sao lưu không hợp lệ hoặc vượt quá 20 MB.');}e.target.value='';};
 $('#present').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{toast('Có thể nhấn F11 để mở toàn màn hình.');}};
 document.addEventListener('fullscreenchange',()=>{$('#present').textContent=document.fullscreenElement?'⛶ Thu nhỏ':'⛶ Toàn màn hình';});
 window.addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{const next=JSON.parse(e.newValue);if(next.conferences?.length&&next.conferences.every(validConference)){const active=state.active;state=next;if(state.conferences.some(c=>c.id===active))state.active=active;render();}}catch{}});
@@ -111,7 +113,7 @@ const backgroundDB=new Promise((resolve,reject)=>{
  request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);
 });
 backgroundDB.catch(()=>{});
-async function readBackground(key){if(!key)return null;const db=await backgroundDB;return new Promise((resolve,reject)=>{const r=db.transaction('images').objectStore('images').get(key);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
+async function readBackground(key){if(!key)return null;if(key.startsWith('supabase:'))return Cloud.image(key);const db=await backgroundDB;return new Promise((resolve,reject)=>{const r=db.transaction('images').objectStore('images').get(key);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 async function imageUrl(file){const url=URL.createObjectURL(file),probe=new Image();probe.src=url;try{await probe.decode();return url;}catch{URL.revokeObjectURL(url);throw Error('image');}}
 // Both presentation buttons use the same upload, storage and fullscreen behavior.
 function createImagePresentation(kind,field,label){
@@ -131,6 +133,7 @@ async function saveBackgroundDraft(){
 }
 element('upload').onchange=async e=>{
  const file=e.target.files[0];if(!file)return;const version=++backgroundVersion;
+ if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)||file.size>20*1024*1024){toast('Chọn ảnh JPG, PNG, WebP hoặc GIF, tối đa 20 MB.');e.target.value='';return;}
  const submit=$('#conference-form button[type="submit"]');submit.disabled=true;
  try{const url=await imageUrl(file);if(version!==backgroundVersion){URL.revokeObjectURL(url);return;}backgroundDraft=file;updateBackgroundPreview(url);element('status').textContent=file.name+' — Bấm Lưu hội nghị để lưu hình.';}catch{toast('Không đọc được hình. Vui lòng chọn tệp ảnh hợp lệ.');e.target.value='';}finally{submit.disabled=false;}
 };
@@ -155,3 +158,80 @@ const backgroundPresentation=createImagePresentation('background','backgroundId'
 const giftPresentation=createImagePresentation('gift','giftImageId','hình Quà');
 // Preserve the previously uploaded global background for the active conference.
 (async()=>{const c=current();try{if(!c.backgroundId&&await readBackground('current')){c.backgroundId='current';persist();}}catch{}})();
+
+function cloudPayload(c){const {_cloud,...data}=c;return data;}
+function markCloudChanges(){
+ for(const c of state.conferences){
+  const value=JSON.stringify(cloudPayload(c));
+  if(cloudSnapshots.get(c.id)!==value){c._cloud={...c._cloud,dirty:true};cloudSnapshots.set(c.id,value);}
+ }
+}
+function cacheCloud(){localStorage.setItem(KEY,JSON.stringify(state));}
+async function syncCloud(){
+ if(!Cloud.user||!cloudReady||cloudBusy)return;
+ cloudBusy=true;
+ $('#save-status').textContent='Đang lưu lên Supabase…';
+ try{
+  for(const c of state.conferences){
+   if(c.demo||!c._cloud?.dirty)continue;
+   for(const field of ['backgroundId','giftImageId']){
+    const imageId=c[field];
+    if(imageId&&!imageId.startsWith('supabase:')){
+     const file=await readBackground(imageId);
+     if(!file)throw Error('Không tìm thấy ảnh cục bộ. Hãy chọn lại ảnh trong thiết lập hội nghị.');
+     const remote=await Cloud.upload(c.id,imageId,file);
+     if(c[field]===imageId)c[field]=remote;
+    }
+   }
+   const data=cloudPayload(c),snapshot=JSON.stringify(data);
+   const revision=await Cloud.save(data,c._cloud?.revision||0);
+   c._cloud={revision,dirty:JSON.stringify(cloudPayload(c))!==snapshot};
+   cloudSnapshots.set(c.id,snapshot);
+   cacheCloud();
+  }
+  $('#save-status').textContent=state.conferences.some(c=>!c.demo&&c._cloud?.dirty)?'Đã lưu trên máy — chờ đồng bộ':'Đã lưu lên Supabase lúc '+new Date().toLocaleTimeString('vi-VN');
+  $('#cloud-message').textContent='Đã đồng bộ hội nghị, danh sách khách hàng và ảnh.';
+ }catch(error){
+  $('#save-status').textContent='Chưa lưu lên Supabase — bản cục bộ được giữ lại';
+  $('#cloud-message').textContent=error.message;
+ }finally{cloudBusy=false;}
+}
+async function loadCloud(replace=false){
+ if(!Cloud.user)return;
+ if(cloudBusy)return;
+ cloudReady=false;
+ $('#save-status').textContent='Đang tải hội nghị từ Supabase…';
+ try{
+  const rows=await Cloud.list();
+  if(!Array.isArray(rows)||!rows.every(row=>validConference(row.payload)&&row.payload.id===row.id))throw Error('Dữ liệu hội nghị trên máy chủ không hợp lệ.');
+  const local=replace?[]:state.conferences.filter(c=>!c.demo);
+  for(const row of rows){
+   const index=local.findIndex(c=>c.id===row.id);
+   const remote={...row.payload,_cloud:{revision:row.revision,dirty:false}};
+   if(index<0)local.push(remote);
+   else if(!local[index]._cloud?.dirty&&local[index]._cloud?.revision)local[index]=remote;
+  }
+  if(local.length){state.conferences=local;if(!local.some(c=>c.id===state.active))state.active=local[0].id;}
+  else if(replace)state=demo();
+  cloudSnapshots.clear();
+  for(const c of state.conferences)cloudSnapshots.set(c.id,JSON.stringify(cloudPayload(c)));
+  cacheCloud();resetEntry();render();cloudReady=true;
+  await syncCloud();
+ }catch(error){$('#save-status').textContent='Chưa kết nối Supabase — đang dùng dữ liệu trên máy';$('#cloud-message').textContent=error.message;}
+}
+$('#cloud-account').onclick=()=>$('#cloud-dialog').showModal();
+$('#cloud-login').onsubmit=async e=>{
+ e.preventDefault();const submit=e.submitter;submit.disabled=true;
+ try{await Cloud.login($('#cloud-email').value.trim(),$('#cloud-password').value);location.reload();}
+ catch(error){$('#cloud-message').textContent=error.message;}
+ finally{submit.disabled=false;}
+};
+$('#cloud-sync').onclick=()=>cloudReady?syncCloud():loadCloud();
+$('#cloud-reload').onclick=()=>{if(confirm('Thay dữ liệu cục bộ bằng bản trên Supabase? Thay đổi chưa đồng bộ sẽ mất. Hãy tải bản sao lưu trước khi tiếp tục.'))void loadCloud(true);};
+$('#cloud-logout').onclick=()=>{if(!cloudBusy)Cloud.logout();else toast('Vui lòng đợi đồng bộ hoàn tất.');};
+if(Cloud.user){$('#cloud-credentials').hidden=true;$('#cloud-actions').hidden=false;$('#cloud-user').textContent=Cloud.user.email;}
+// Remember dirty conferences across reloads, including changes made while offline.
+for(const c of state.conferences){if(!c._cloud)c._cloud={revision:0,dirty:true};cloudSnapshots.set(c.id,JSON.stringify(cloudPayload(c)));}
+void loadCloud();
+window.addEventListener('online',()=>cloudReady?syncCloud():loadCloud());
+setInterval(()=>{if(Cloud.user&&state.conferences.some(c=>!c.demo&&c._cloud?.dirty))void(cloudReady?syncCloud():loadCloud());},15000);
