@@ -134,3 +134,104 @@ th[aria-sort="ascending"] .sort-arrow,th[aria-sort="descending"] .sort-arrow{opa
 /* Hide the table scrollbar while preserving wheel and touch scrolling. */
 .presentation-table{scrollbar-width:none;scrollbar-gutter:auto}
 .presentation-table::-webkit-scrollbar{display:none}
+
+/* Touch layout: natural page scrolling and readable customer cards. */
+.mobile-only{display:none}
+.toolbar-toggle .toolbar-caption{display:none}
+@media(max-width:900px){
+ html,body{height:auto;overflow:auto}
+ #presentation{height:auto;min-height:100dvh;overflow:visible;padding:16px max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+ .mobile-only{display:block}
+ .stage-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding-bottom:16px}
+ .stage-toolbar .brand,.stage-toolbar:has(.tools-reveal.is-open) .brand{display:flex;min-width:0}
+ .stage-toolbar .brand-logo{width:min(190px,100%)}
+ .toolbar-toggle{display:flex;align-items:center;justify-content:center;gap:10px;min-height:44px;order:0;padding:6px 12px}
+ .toolbar-toggle[aria-expanded] .toolbar-caption{display:block;font-size:13px;transform:none;transition:none}
+ .tools-reveal{display:none;grid-column:1/-1;order:0}
+ .tools-reveal.is-open{display:block;overflow:visible}
+ .tools-reveal .stage-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;gap:8px;padding:2px;transform:none;transition:none}
+ .stage-tools .button,.stage-tools select{width:100%;max-width:none;min-width:0;min-height:44px;padding:10px 8px;font-size:13px;white-space:normal}
+ .stage-tools select{grid-column:1/-1;font-size:16px}
+ #presentation .presentation-heading{margin:22px 0 4px;text-align:left}
+ #presentation .presentation-heading h1{font-size:clamp(23px,4vw,30px);line-height:1.4;letter-spacing:-.5px;overflow-wrap:anywhere}
+ #presentation .stats{gap:10px;margin:16px 0 20px}
+ #presentation .stat{min-width:0;padding:16px 12px;text-align:left;border-radius:12px}
+ #presentation .stat-label{justify-content:flex-start;min-height:0;font-size:12px;line-height:1.6}
+ #presentation .stat-number{font-size:clamp(18px,3vw,27px);line-height:1.4;letter-spacing:-.6px;white-space:normal;overflow-wrap:anywhere;margin:8px 0 0;font-variant-numeric:tabular-nums}
+ #presentation .stat-number small{display:block;font-size:12px;margin:4px 0 0;letter-spacing:0}
+ .gift-toolbar{margin-bottom:14px;min-width:0}
+ #gift-filters{gap:8px;padding:4px 3px 8px;scrollbar-width:thin}
+ .gift-filter{min-height:44px;font-size:13px;padding:10px 14px}
+ .mobile-list-tools{margin-bottom:16px}
+ .mobile-list-tools label{font-size:13px;margin:0 0 8px}
+ .mobile-list-tools select{width:100%;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:white;color:var(--ink);font-size:16px}
+ .mobile-list-tools p{font-size:12px;font-weight:400;line-height:1.7;color:#52708b;margin:10px 0 0}
+ #customer-form{flex:none;min-width:0}
+ .presentation-table{flex:none;border:0;background:transparent;overflow:visible;border-radius:0}
+ .presentation-table table{display:flex;flex-direction:column;min-width:0;width:100%;table-layout:auto}
+ .presentation-table thead{display:none}
+ .presentation-table tbody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;order:1}
+ .presentation-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:start;gap:12px;background:white;border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+ .presentation-table tbody tr:nth-child(even){background:white}
+ .presentation-table tbody td{display:block;width:auto;min-width:0;padding:0;border:0;grid-column:1/-1;font-size:15px;line-height:1.6;white-space:normal}
+ .presentation-table tbody td[data-label]::before,.inline-entry td[data-label]::before{content:attr(data-label);display:block;color:#52708b;font-size:12px;font-weight:500;line-height:1.6;margin-bottom:3px}
+ .presentation-table tbody td:first-child{grid-column:2;grid-row:1;font-size:12px;color:#52708b;text-align:right}
+ .presentation-table tbody td:first-child::before{display:inline;margin-right:4px}
+ .presentation-table tbody td:nth-child(2){grid-column:1;grid-row:1}
+ .presentation-table tbody td b{font-size:17px;font-weight:700}
+ .presentation-table tbody .gift-cell{font-size:14px;color:var(--ink)}
+ .presentation-table tbody .gift-value{font-size:16px}
+ .presentation-table tbody td:last-child{border-top:1px solid var(--line);padding-top:10px}
+ .presentation-table .row-actions{opacity:1;justify-content:flex-end;gap:8px}
+ .presentation-table .row-actions button{min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:8px;background:#ffffffa6}
+ .presentation-table tbody tr.gift-received::after{content:'✓ Đã tặng quà';grid-column:1/-1;color:#785d16;font-size:12px}
+ .presentation-table tbody tr:has(.stage-empty){grid-column:1/-1}
+ .presentation-table tbody .stage-empty{padding:24px 0;font-size:14px}
+ .presentation-table tfoot{display:block;margin-bottom:20px}
+ .presentation-table .inline-entry{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:16px;border:1px solid #cbdff1;border-radius:12px}
+ .presentation-table .inline-entry td{display:block;position:static;width:auto;min-width:0;padding:0;border:0;background:none;box-shadow:none;white-space:normal;font-size:14px}
+ .presentation-table .inline-entry #entry-index{grid-column:1/-1;font-size:18px;color:var(--green)}
+ #entry-index::after{content:' Đăng ký khách hàng';font-size:16px}
+ .entry-label{font-size:13px;margin:0 0 7px}
+ .inline-entry input,.inline-entry input::placeholder{font-size:16px;font-weight:400}
+ .inline-entry input{min-height:48px;scroll-margin-block:24px}
+ .inline-entry td:nth-child(2){grid-column:1/-1}
+ .inline-entry td:nth-child(3){grid-column:1;grid-row:3}
+ .inline-entry td:nth-child(6){grid-column:2;grid-row:3}
+ .inline-entry td:nth-child(4),.inline-entry td:nth-child(5){grid-column:1/-1}
+ .inline-entry .entry-actions{grid-column:1/-1;display:flex!important;gap:10px}
+ .inline-entry .button{flex:1;min-height:48px;font-size:15px;margin:0}
+ .presentation-bottom{margin-top:20px;font-size:11px;line-height:1.7}
+ dialog:not(#background-dialog){width:calc(100% - 24px);max-width:640px;max-height:calc(100dvh - 24px);padding:20px;border-radius:16px;overscroll-behavior:contain}
+ .dialog-header{gap:12px;margin-bottom:20px;align-items:flex-start}
+ .dialog-header h2{font-size:23px;line-height:1.4;overflow-wrap:anywhere}
+ .dialog-header .eyebrow{font-size:11px;letter-spacing:1px}
+ .dialog-header .icon-button{width:44px;height:44px;flex-shrink:0;font-size:24px}
+ .dialog-fields input,.tier-row input,.tier-row select{min-height:46px;font-size:16px}
+ .two-fields{grid-template-columns:1fr;gap:0}
+ .two-fields>*{min-width:0}
+ .tiers-heading{align-items:flex-start;flex-wrap:wrap}
+ .tiers-heading p,dialog .policy-hint{font-size:12px;font-weight:400}
+ .tier-labels{display:none}
+ .tier-row{grid-template-columns:minmax(0,1fr) 44px;gap:10px;background:#f4f8fc;padding:12px;border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
+ .tier-threshold,.tier-gift,.tier-value{grid-column:1;min-width:0}
+ .tier-threshold select{width:85px}
+ .tier-row button{grid-column:2;grid-row:1;min-height:44px;font-size:22px}
+ dialog .button{min-height:44px;white-space:normal}
+ .dialog-footer{gap:10px}
+ .dialog-footer .button{flex:1}
+ .backup-actions{flex-direction:column;gap:10px}
+ .backup-actions .button{text-align:center}
+ #toast{width:max-content;max-width:calc(100% - 32px);padding:12px 16px;font-size:13px;bottom:max(16px,env(safe-area-inset-bottom));text-align:center}
+}
+@media(max-width:600px){
+ #presentation .stats{grid-template-columns:1fr}
+ #presentation .stat{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px}
+ #presentation .stat-label{flex:1;font-size:13px}
+ #presentation .stat-number{flex:1;min-width:0;text-align:right;font-size:22px;margin:0}
+ #presentation .stat-number small{font-size:11px;margin-top:2px}
+ .presentation-table tbody{grid-template-columns:1fr}
+ .presentation-table .inline-entry{grid-template-columns:minmax(0,1fr)}
+ .inline-entry td:nth-child(3),.inline-entry td:nth-child(6){grid-column:1;grid-row:auto}
+ .inline-entry td:nth-child(6){grid-row:4}
+}
