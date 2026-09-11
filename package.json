@@ -1,1 +1,13 @@
-{"name":"hoi-ngo","version":"1.0.0","private":true,"scripts":{"start":"node server.js","test":"node --test tests/*.test.js"},"devDependencies":{"@playwright/test":"^1.63.0"}}
+{
+  "name": "hoi-ngo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js",
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}

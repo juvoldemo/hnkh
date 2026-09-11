@@ -7,3 +7,6 @@ playwright-report/
 .env
 .env.*
 !.env.example
+
+dist/
+.vercel/
