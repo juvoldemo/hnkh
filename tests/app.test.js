@@ -1,0 +1,99 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {chromium}=require('@playwright/test');
+const {spawn}=require('node:child_process');
+test('Direct presentation entry, Enter, thresholds, editing, persistence, backup and fullscreen',async()=>{
+ const server=spawn(process.execPath,['server.js'],{env:{...process.env,PORT:'3100'},stdio:'pipe'});
+ await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('error',reject);});
+ let browser;
+ try{
+ browser=await chromium.launch({headless:true,executablePath:chromium.executablePath()});const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://localhost:3100');
+ assert.equal(await page.locator('#toggle-tools').getAttribute('aria-expanded'),'false');
+ assert.equal(await page.locator('#create-conference').isVisible(),false);
+ await page.locator('#toggle-tools').click();
+ await page.locator('#create-conference').waitFor({state:'visible'});
+ await page.locator('#toggle-tools').press('Enter');
+ assert.equal(await page.locator('#conference-tools').evaluate(el=>el.inert),true);
+
+ assert.equal(await page.locator('.sidebar,.entry-panel,.conference-banner').count(),0);
+ assert.match(await page.locator('#stat-count').innerText(),/8/);
+ assert.match(await page.locator('#stat-investment').innerText(),/300\.000\.000/);
+ const columns={index:1,name:2,amount:3,gift:4,value:5,advisor:6};
+ for(const [key,column] of Object.entries(columns)){
+  const cells=page.locator('#presentation-rows tr td:nth-child('+column+')');
+  const values=await cells.allTextContents();const numeric=['index','amount','value'].includes(key);
+  const compare=(a,b)=>numeric?Number(a.replace(/\D/g,''))-Number(b.replace(/\D/g,'')):a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'});
+  const header=page.locator('[data-sort="'+key+'"]');
+  // STT starts ascending; all other columns start inactive.
+  if(key==='index')await header.click();
+  await header.click();assert.deepEqual(await cells.allTextContents(),[...values].sort(compare));
+  assert.equal(await header.locator('..').getAttribute('aria-sort'),'ascending');
+  await header.press('Enter');assert.deepEqual(await cells.allTextContents(),[...values].sort((a,b)=>-compare(a,b)));
+ }
+ await page.locator('[data-sort="index"]').click();
+ await page.locator('[data-gift-filter="Vali"]').click();
+ assert.equal(await page.locator('#presentation-rows tr').count(),3);
+ assert.equal(await page.locator('#presentation-rows input[type=checkbox]').count(),0);
+ const box=page.locator('[data-customer-id]').first();const customerId=await box.getAttribute('data-customer-id');
+ await box.locator('td').nth(1).click();
+ await page.locator('[data-sort="name"]').click();
+ assert.equal(await page.locator('#presentation-rows tr').count(),3);
+ assert.equal(await page.locator('[data-customer-id="'+customerId+'"]').evaluate(el=>el.classList.contains('gift-received')),true);
+ await page.locator('[data-customer-id="'+customerId+'"] [data-edit]').click();
+ assert.equal(await page.locator('tr.gift-received').count(),1);
+ await page.locator('#cancel-edit').click();
+ assert.equal(await page.locator('tr.gift-received').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 244, 194)');
+ await page.locator('[data-gift-filter=""]').click();assert.equal(await page.locator('#presentation-rows tr').count(),8);
+ await page.reload();assert.equal(await page.locator('[data-customer-id="'+customerId+'"]').evaluate(el=>el.classList.contains('gift-received')),true);
+ await page.locator('[data-customer-id="'+customerId+'"]').click();assert.equal(await page.locator('tr.gift-received').count(),0);
+ await page.reload();assert.equal(await page.locator('[data-customer-id="'+customerId+'"]').evaluate(el=>el.classList.contains('gift-received')),false);
+ for(const [amount,value] of [['19999999','0'],['20000000','1.300.000'],['34999999','1.300.000'],['35000000','3.000.000'],['300000000','42.500.000']]){await page.locator('#customer-amount').fill(amount);assert.equal(await page.locator('#preview-value').innerText(),value);}
+ await page.locator('#customer-amount').fill('');await page.screenshot({path:'test-results/desktop.png',fullPage:true});
+ await page.locator('#toggle-tools').click();await page.locator('#create-conference').click();await page.locator('#event-name').fill('Hội nghị kiểm thử');await page.locator('#event-date').fill('2026-09-20');await page.locator('#event-location').fill('Hà Nội');
+ await page.locator('.tier-row').first().locator('select').selectOption('exclusive');
+ await page.locator('#conference-form button[type=submit]').click();assert.equal(await page.locator('#presentation-title').innerText(),'Hội nghị kiểm thử');assert.equal(await page.locator('#presentation-subtitle,.stage-list-heading,.presentation-heading .eyebrow').count(),0);
+ await page.locator('#customer-name').fill('Nguyễn Văn An');await page.locator('#customer-advisor').fill('Trần Mai');await page.locator('#customer-amount').fill('20000000');assert.equal(await page.locator('#preview-value').innerText(),'0');await page.locator('#customer-amount').fill('20000001');assert.equal(await page.locator('#preview-value').innerText(),'1.300.000');await page.locator('#customer-advisor').press('Enter');
+ assert.match(await page.locator('#stat-investment').innerText(),/20\.000\.001/);await page.reload();assert.equal(await page.locator('#presentation-rows tr').count(),1);
+ await page.locator('[data-edit]').click();await page.locator('#customer-amount').fill('50000000');await page.locator('#submit-customer').click();assert.match(await page.locator('#stat-gifts').innerText(),/6\.500\.000/);
+ await page.locator('#toggle-tools').click();await page.locator('#edit-conference').click();await page.locator('.tier-row').nth(2).locator('.tier-value').fill('8000000');await page.locator('#conference-form button[type=submit]').click();assert.match(await page.locator('#stat-gifts').innerText(),/8\.000\.000/);
+ const csvPromise=page.waitForEvent('download');await page.locator('#export').click();assert.match((await csvPromise).suggestedFilename(),/\.csv$/);
+ await page.locator('#header-backup').click();const backupPromise=page.waitForEvent('download');await page.locator('#download-backup').click();const backup=await backupPromise;await page.locator('#restore').setInputFiles(await backup.path());await page.waitForFunction(()=>document.querySelectorAll('#conference-select option').length===4);
+ assert.equal(await page.locator('#presentation-rows tr').count(),8);assert.equal(await page.locator('#slide-page,#prev-slide,#next-slide,#auto-slides').count(),0);
+ await page.locator('#customer-name').fill('Khách mới');
+ await page.locator('#customer-amount').fill('70000000');await page.locator('#customer-advisor').fill('TVV mới');await page.locator('#present').click();await page.locator('#customer-advisor').press('Enter');assert.match(await page.locator('#stat-count').innerText(),/9/);assert.match(await page.locator('#presentation-rows').innerText(),/Khách mới/);await page.locator('#present').click();assert.equal(await page.locator('#presentation').isVisible(),true);
+ await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/mobile.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ page.on('dialog',d=>d.accept());await page.locator('[data-delete]').first().click();assert.match(await page.locator('#stat-count').innerText(),/8/);
+ await page.locator('#edit-conference').click();
+ await page.locator('#background-upload').setInputFiles('logo.png');
+ await page.locator('#background-preview').waitFor({state:'visible'});
+ assert.equal(await page.locator('#background-dialog').isVisible(),false);
+ await page.locator('#conference-form button[type=submit]').click();
+ await page.locator('#show-background').click();
+ await page.locator('#background-dialog').waitFor({state:'visible'});
+ assert.equal(await page.locator('#background-image').evaluate(el=>el.naturalWidth>0),true);
+ assert.equal(await page.evaluate(()=>document.elementFromPoint(innerWidth/2,innerHeight/2)?.id),'background-image');
+
+ assert.equal(await page.locator('#background-dialog').evaluate(el=>Math.abs(el.getBoundingClientRect().width-innerWidth)<2),true);
+ await page.locator('#close-background').click();
+ await page.locator('#background-dialog').waitFor({state:'hidden'});
+ await page.reload();await page.locator('#toggle-tools').click();
+ await page.locator('#show-background').click();
+ await page.locator('#background-dialog').waitFor({state:'visible'});
+ assert.equal(await page.locator('#background-image').evaluate(el=>el.naturalWidth>0),true);
+ await page.locator('#close-background').click();
+ const savedConference=await page.locator('#conference-select').inputValue();
+ await page.locator('#create-conference').click();
+ assert.equal(await page.locator('#background-preview').isVisible(),false);
+ await page.locator('#event-name').fill('Hội nghị không có background');
+ await page.locator('#event-date').fill('2026-09-20');
+ await page.locator('#conference-form button[type=submit]').click();
+ await page.locator('#show-background').click();
+ assert.equal(await page.locator('#background-dialog').isVisible(),false);
+ await page.locator('#conference-select').selectOption(savedConference);
+ await page.locator('#edit-conference').click();
+ await page.locator('#background-preview').waitFor({state:'visible'});
+ await page.locator('#conference-dialog .close-dialog').first().click();
+ assert.deepEqual(errors,[]);
+ }finally{if(browser)await browser.close();server.kill();}
+});

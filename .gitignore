@@ -1,0 +1,9 @@
+node_modules/
+test-results/
+playwright-report/
+
+# Local documents and environment settings
+*.pdf
+.env
+.env.*
+!.env.example
