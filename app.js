@@ -78,13 +78,13 @@ function toggleGiftReceived(row){
 }
 $('#presentation-rows').onkeydown=e=>{if(e.target.matches('tr[data-customer-id]')&&(e.key==='Enter'||e.key===' ')){e.preventDefault();toggleGiftReceived(e.target);}};
 function toast(message) {$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),3600);}
-function persist(){markCloudChanges();try{localStorage.setItem(KEY,JSON.stringify(state));$('#save-status').textContent=Cloud.user?'Đã lưu trên máy — chờ đồng bộ':'Đã lưu trên máy — đăng nhập để lưu Supabase';if(cloudReady)void syncCloud();return true;}catch{$('#save-status').textContent='Không thể lưu — hãy tải bản sao lưu';toast('Trình duyệt không thể lưu. Hãy sao lưu dữ liệu ngay.');return false;}}
+function persist(){markCloudChanges();try{localStorage.setItem(KEY,JSON.stringify(state));$('#save-status').textContent='Đã lưu trên máy — chờ đồng bộ';if(cloudReady)void syncCloud();return true;}catch{$('#save-status').textContent='Không thể lưu — hãy tải bản sao lưu';toast('Trình duyệt không thể lưu. Hãy sao lưu dữ liệu ngay.');return false;}}
 function dateLabel(date){return new Date(date+'T12:00:00').toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});}
 function totals(){return current().customers.reduce((s,c)=>({amount:s.amount+c.amount,gifts:s.gifts+giftFor(c.amount).value}),{amount:0,gifts:0});}
-function render(){const c=current(),t=totals();$('#presentation-title').textContent=c.name;$('#conference-select').innerHTML=state.conferences.map(e=>`<option value="${esc(e.id)}" ${e.id===c.id?'selected':''}>${esc(e.name)}</option>`).join('');$('#stat-count').innerHTML=fmt(c.customers.length)+' <small>khách hàng</small>';$('#stat-investment').innerHTML=fmt(t.amount)+' <small>VNĐ</small>';$('#stat-gifts').innerHTML=fmt(t.gifts)+' <small>VNĐ</small>';$('#advisors').innerHTML=[...new Set(c.customers.map(x=>x.advisor))].map(a=>`<option value="${esc(a)}"></option>`).join('');renderRows();preview();}
-function renderRows(){renderGiftFilters();renderSortHeaders();const rows=sortedCustomers();$('#presentation-rows').innerHTML=rows.length?rows.map(({customer:x,index})=>{const g=giftFor(x.amount);return `<tr data-customer-id="${esc(x.id)}" tabindex="0" aria-label="${esc(x.name)}${x.giftReceived===true?' — Đã tặng quà. Bấm để bỏ đánh dấu.':' — Chưa tặng quà. Bấm để xác nhận đã tặng.'}" class="${editing===x.id?'editing-row':''} ${x.giftReceived===true?'gift-received':''}"><td data-label="STT">${index}</td><td><b>${esc(x.name)}</b></td><td class="investment" data-label="Phí đầu tư (VNĐ)">${fmt(x.amount)}</td><td class="gift-cell" data-label="Quà tặng tại hội nghị">${esc(g.gift)}</td><td class="investment gift-value" data-label="Giá trị quà (VNĐ)">${fmt(g.value)}</td><td data-label="Tư vấn viên">${esc(x.advisor)}</td><td><div class="row-actions"><button type="button" data-edit="${esc(x.id)}" aria-label="Sửa ${esc(x.name)}" title="Sửa đăng ký">✎</button><button type="button" data-delete="${esc(x.id)}" aria-label="Xóa ${esc(x.name)}" title="Xóa đăng ký">×</button></div></td></tr>`;}).join(''):`<tr><td colspan="7" class="stage-empty">${selectedGift?'Chưa có khách hàng nhận loại quà này.':'Chào đón đăng ký đầu tiên — nhập thông tin ngay bên dưới.'}</td></tr>`;}
+function render(){const c=current(),t=totals();$('#presentation-title').textContent=c.name;$('#conference-select').innerHTML=state.conferences.map(e=>`<option value="${esc(e.id)}" ${e.id===c.id?'selected':''}>${esc(e.name)}</option>`).join('');$('#stat-count').innerHTML=fmt(c.customers.length)+' <small>khách hàng</small>';$('#stat-investment').innerHTML=fmt(t.amount)+' <small>VNĐ</small>';$('#stat-gifts').innerHTML=fmt(t.gifts)+' <small>VNĐ</small>';renderRows();preview();}
+function renderRows(){renderGiftFilters();renderSortHeaders();const rows=sortedCustomers();$('#presentation-rows').innerHTML=rows.length?rows.map(({customer:x,index},displayIndex)=>{const g=giftFor(x.amount),serial=selectedGift?displayIndex+1:index;return `<tr data-customer-id="${esc(x.id)}" tabindex="0" aria-label="${esc(x.name)}${x.giftReceived===true?' — Đã tặng quà. Bấm để bỏ đánh dấu.':' — Chưa tặng quà. Bấm để xác nhận đã tặng.'}" class="${editing===x.id?'editing-row':''} ${x.giftReceived===true?'gift-received':''}"><td data-label="STT">${serial}</td><td><b class="customer-gradient">${esc(x.name)}</b></td><td class="investment customer-gradient" data-label="Phí đầu tư (VNĐ)">${fmt(x.amount)}</td><td class="gift-cell" data-label="Quà tặng tại hội nghị">${esc(g.gift)}</td><td class="investment gift-value" data-label="Giá trị quà (VNĐ)">${fmt(g.value)}</td><td data-label="Tư vấn viên">${esc(x.advisor)}</td><td><div class="row-actions"><button type="button" data-edit="${esc(x.id)}" aria-label="Sửa ${esc(x.name)}" title="Sửa đăng ký">✎</button><button type="button" data-delete="${esc(x.id)}" aria-label="Xóa ${esc(x.name)}" title="Xóa đăng ký">×</button></div></td></tr>`;}).join(''):`<tr><td colspan="7" class="stage-empty">${selectedGift?'Chưa có khách hàng nhận loại quà này.':'Chào đón đăng ký đầu tiên — nhập thông tin ngay bên dưới.'}</td></tr>`;}
 function preview(){const amount=number($('#customer-amount').value),g=amount?giftFor(amount):{gift:'Quà tặng tự động',value:0};$('#preview-gift').textContent=g.gift;$('#preview-value').textContent=fmt(g.value);}
-function resetEntry(){editing=null;$('#customer-form').reset();$('#submit-customer').textContent='＋ Thêm';$('#entry-index').textContent='＋';$('#cancel-edit').hidden=true;preview();}
+function resetEntry(){editing=null;$('#customer-form').reset();AdvisorPicker.close();$('#submit-customer').textContent='＋ Thêm';$('#entry-index').textContent='＋';$('#cancel-edit').hidden=true;preview();}
 $('#customer-amount').addEventListener('input',e=>{const n=number(e.target.value);e.target.value=n?fmt(n):'';preview();});
 $('#customer-form').onsubmit=e=>{e.preventDefault();const name=$('#customer-name').value.trim(),advisor=$('#customer-advisor').value.trim(),amount=number($('#customer-amount').value);if(!name||!advisor||!Number.isSafeInteger(amount)||amount<=0||amount>1e15){toast('Vui lòng nhập tên, TVV và phí đầu tư hợp lệ.');return;}const c=current(),wasEditing=!!editing;if(editing){const x=c.customers.find(x=>x.id===editing);if(!x){toast('Đăng ký này đã bị xóa. Vui lòng nhập lại.');resetEntry();render();return;}Object.assign(x,{name,advisor,amount});}else{c.customers.push({id:uid(),name,advisor,amount,created:Date.now()});}const saved=persist();resetEntry();render();if(saved)toast(wasEditing?'Đã cập nhật đăng ký.':'Đã thêm khách hàng.');$('#customer-name').focus();};
 $('#cancel-edit').onclick=()=>{resetEntry();renderRows();};
@@ -99,10 +99,34 @@ $('#conference-form').onsubmit=async e=>{e.preventDefault();const name=$('#event
 function download(content,type,filename){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('#export').onclick=()=>{const c=current(),t=totals();const safe=s=>{const text=String(s);return /^[=+\-@\t\r\n]/.test(text)?"'"+text:text;};const rows=[['Hội nghị',c.name],['Ngày',dateLabel(c.date)],['STT','Khách hàng','Phí đầu tư (VNĐ)','Quà tặng','Giá trị quà (VNĐ)','Tư vấn viên'],...c.customers.map((x,i)=>{const g=giftFor(x.amount);return[i+1,x.name,x.amount,g.gift,g.value,x.advisor];}),['TỔNG',c.customers.length,t.amount,'',t.gifts,'']];download('\ufeff'+rows.map(row=>row.map(x=>'"'+safe(x).replace(/"/g,'""')+'"').join(',')).join('\r\n'),'text/csv;charset=utf-8',`dang-ky-hoi-nghi-${c.date}.csv`);toast('Đã xuất tệp CSV — mở được bằng Excel.');};
 $('#download-backup').onclick=()=>download(JSON.stringify({version:1,conferences:state.conferences},null,2),'application/json',`hoi-ngo-sao-luu-${new Date().toISOString().slice(0,10)}.json`);
-$('#header-backup').onclick=()=>$('#backup-dialog').showModal();
+$('#register').onclick=async()=>{
+ const imageDialog=document.querySelector('#background-dialog[open],#gift-dialog[open]');
+ if(imageDialog){imageDialog.dataset.keepFullscreen='true';imageDialog.close();}
+ $('#customer-name').scrollIntoView({block:'end',behavior:'smooth'});
+ setTimeout(()=>$('#customer-name').focus({preventScroll:true}),250);
+};
 $('#restore').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>20e6)throw Error();const data=JSON.parse(await file.text());if(data.version!==1||!Array.isArray(data.conferences)||!data.conferences.length||!data.conferences.every(validConference))throw Error();const imported=data.conferences.map(c=>({...c,id:uid(),demo:false,_cloud:{revision:0,dirty:true},customers:c.customers.map((x,i)=>({...x,id:uid(),created:Number.isFinite(x.created)?x.created:Date.now()+i}))}));state.conferences.push(...imported);state.active=imported[0].id;selectedGift='';const saved=persist();resetEntry();render();$('#backup-dialog').close();if(saved)toast(`Đã khôi phục ${imported.length} hội nghị.`);}catch{toast('Tệp sao lưu không hợp lệ hoặc vượt quá 20 MB.');}e.target.value='';};
-$('#present').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{toast('Có thể nhấn F11 để mở toàn màn hình.');}};
-document.addEventListener('fullscreenchange',()=>{$('#present').textContent=document.fullscreenElement?'⛶ Thu nhỏ':'⛶ Toàn màn hình';});
+$('#present').onclick=async()=>{
+ const imageDialog=document.querySelector('#background-dialog[open],#gift-dialog[open]');
+ if(imageDialog){try{if(document.fullscreenElement)await document.exitFullscreen();}finally{imageDialog.close();}return;}
+ try{
+ if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();
+}catch{toast('Có thể nhấn F11 để mở toàn màn hình.');}};
+const fullscreenEntryDock=document.createElement('div');
+fullscreenEntryDock.id='fullscreen-entry-dock';
+fullscreenEntryDock.hidden=true;
+fullscreenEntryDock.innerHTML='<table><tfoot></tfoot></table>';
+$('#customer-form').append(fullscreenEntryDock);
+function placeFullscreenEntry(){
+ const fullscreen=document.fullscreenElement===document.documentElement;
+ const footer=$('.presentation-table tfoot');
+ const dockFooter=$('#fullscreen-entry-dock tfoot');
+ if(fullscreen&&footer) dockFooter.append(footer);
+ else if(!fullscreen&&dockFooter.children.length) $('.presentation-table table').append(dockFooter.firstElementChild);
+ fullscreenEntryDock.hidden=!fullscreen;
+ $('#present').textContent=fullscreen?'⛶ Thu nhỏ':'⛶ Toàn màn hình';
+}
+document.addEventListener('fullscreenchange',placeFullscreenEntry);
 window.addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{const next=JSON.parse(e.newValue);if(next.conferences?.length&&next.conferences.every(validConference)){const active=state.active;state=next;if(state.conferences.some(c=>c.id===active))state.active=active;render();}}catch{}});
 render();if(storageFailed)toast('Không đọc được dữ liệu đã lưu. Đang hiển thị dữ liệu minh họa.');
 
@@ -119,6 +143,18 @@ async function imageUrl(file){const url=URL.createObjectURL(file),probe=new Imag
 function createImagePresentation(kind,field,label){
 const element=suffix=>$('#'+kind+'-'+suffix);
 let backgroundUrl='',backgroundOwnsFullscreen=false,backgroundDraft=null,backgroundDraftId=null,previewUrl='',backgroundVersion=0;
+let toolsWereOpen=false,toolsWereInert=true;
+function showImageTasks(dialog){
+ const tools=$('#conference-tools');
+ toolsWereOpen=tools.classList.contains('is-open');toolsWereInert=tools.inert;
+ dialog.append(tools);tools.classList.add('image-tools');tools.classList.remove('is-open');tools.inert=false;
+ const back=$('#close-'+kind);back.setAttribute('aria-expanded','false');
+}
+function restoreImageTasks(){
+ const tools=$('#conference-tools');
+ if(!tools.classList.contains('image-tools'))return;
+ $('#toggle-tools').after(tools);tools.classList.remove('image-tools');tools.classList.toggle('is-open',toolsWereOpen);tools.inert=toolsWereInert;
+}
 function updateBackgroundPreview(url){if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=url;element('preview').hidden=!url;if(url)element('preview').src=url;else element('preview').removeAttribute('src');}
 async function prepareBackground(c){
  const version=++backgroundVersion;backgroundDraft=null;backgroundDraftId=c[field]||null;
@@ -144,13 +180,23 @@ async function openBackground(){
   try{await document.documentElement.requestFullscreen();backgroundOwnsFullscreen=true;}catch{backgroundOwnsFullscreen=false;}
  }
  if(!dialog.open)dialog.showModal();
+ showImageTasks(dialog);
 }
 $('#show-'+kind).onclick=async()=>{
  const c=current();if(!c[field]){toast('Hãy thêm '+label+' trong mục Thiết lập & quà tặng.');return;}
  try{const file=await readBackground(c[field]);if(!file)throw Error();const url=await imageUrl(file);if(current().id!==c.id){URL.revokeObjectURL(url);return;}if(backgroundUrl)URL.revokeObjectURL(backgroundUrl);backgroundUrl=url;element('image').src=url;await openBackground();}catch{toast('Không đọc được '+label+'. Hãy chọn lại hình trong Thiết lập & quà tặng.');}
 };
-$('#close-'+kind).onclick=()=>element('dialog').close();
-element('dialog').addEventListener('close',()=>{if(backgroundOwnsFullscreen&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});backgroundOwnsFullscreen=false;$('#show-'+kind).focus();});
+$('#close-'+kind).onclick=()=>{
+ const tools=$('#conference-tools'),open=!tools.classList.contains('is-open');
+ tools.classList.toggle('is-open',open);$('#close-'+kind).setAttribute('aria-expanded',String(open));
+};
+element('dialog').addEventListener('close',()=>{
+ const keepFullscreen=element('dialog').dataset.keepFullscreen==='true';
+ delete element('dialog').dataset.keepFullscreen;
+ restoreImageTasks();
+ if(!keepFullscreen&&backgroundOwnsFullscreen&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+ backgroundOwnsFullscreen=false;$('#show-'+kind).focus();
+});
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&backgroundOwnsFullscreen){backgroundOwnsFullscreen=false;if(element('dialog').open)element('dialog').close();}});
 return {prepare:prepareBackground,save:saveBackgroundDraft};
 }
@@ -168,7 +214,7 @@ function markCloudChanges(){
 }
 function cacheCloud(){localStorage.setItem(KEY,JSON.stringify(state));}
 async function syncCloud(){
- if(!Cloud.user||!cloudReady||cloudBusy)return;
+ if(!cloudReady||cloudBusy)return;
  cloudBusy=true;
  $('#save-status').textContent='Đang lưu lên Supabase…';
  try{
@@ -197,7 +243,6 @@ async function syncCloud(){
  }finally{cloudBusy=false;}
 }
 async function loadCloud(replace=false){
- if(!Cloud.user)return;
  if(cloudBusy)return;
  cloudReady=false;
  $('#save-status').textContent='Đang tải hội nghị từ Supabase…';
@@ -220,18 +265,10 @@ async function loadCloud(replace=false){
  }catch(error){$('#save-status').textContent='Chưa kết nối Supabase — đang dùng dữ liệu trên máy';$('#cloud-message').textContent=error.message;}
 }
 $('#cloud-account').onclick=()=>$('#cloud-dialog').showModal();
-$('#cloud-login').onsubmit=async e=>{
- e.preventDefault();const submit=e.submitter;submit.disabled=true;
- try{await Cloud.login($('#cloud-email').value.trim(),$('#cloud-password').value);location.reload();}
- catch(error){$('#cloud-message').textContent=error.message;}
- finally{submit.disabled=false;}
-};
 $('#cloud-sync').onclick=()=>cloudReady?syncCloud():loadCloud();
 $('#cloud-reload').onclick=()=>{if(confirm('Thay dữ liệu cục bộ bằng bản trên Supabase? Thay đổi chưa đồng bộ sẽ mất. Hãy tải bản sao lưu trước khi tiếp tục.'))void loadCloud(true);};
-$('#cloud-logout').onclick=()=>{if(!cloudBusy)Cloud.logout();else toast('Vui lòng đợi đồng bộ hoàn tất.');};
-if(Cloud.user){$('#cloud-credentials').hidden=true;$('#cloud-actions').hidden=false;$('#cloud-user').textContent=Cloud.user.email;}
 // Remember dirty conferences across reloads, including changes made while offline.
 for(const c of state.conferences){if(!c._cloud)c._cloud={revision:0,dirty:true};cloudSnapshots.set(c.id,JSON.stringify(cloudPayload(c)));}
 void loadCloud();
 window.addEventListener('online',()=>cloudReady?syncCloud():loadCloud());
-setInterval(()=>{if(Cloud.user&&state.conferences.some(c=>!c.demo&&c._cloud?.dirty))void(cloudReady?syncCloud():loadCloud());},15000);
+setInterval(()=>{if(!cloudReady||state.conferences.some(c=>!c.demo&&c._cloud?.dirty))void(cloudReady?syncCloud():loadCloud());},15000);

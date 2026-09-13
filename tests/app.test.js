@@ -8,6 +8,8 @@ test('Direct presentation entry, Enter, thresholds, editing, persistence, backup
  let browser;
  try{
  browser=await chromium.launch({headless:true,executablePath:chromium.executablePath()});const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/rest/v1/**',route=>route.abort());
+ await page.route('**/storage/v1/**',route=>route.abort());
  await page.goto('http://localhost:3100');
  assert.equal(await page.locator('#toggle-tools').getAttribute('aria-expanded'),'false');
  assert.equal(await page.locator('#create-conference').isVisible(),false);
@@ -34,6 +36,7 @@ test('Direct presentation entry, Enter, thresholds, editing, persistence, backup
  await page.locator('[data-sort="index"]').click();
  await page.locator('[data-gift-filter="Vali"]').click();
  assert.equal(await page.locator('#presentation-rows tr').count(),3);
+ assert.deepEqual(await page.locator('#presentation-rows tr td:first-child').allTextContents(),['1','2','3']);
  assert.equal(await page.locator('#presentation-rows input[type=checkbox]').count(),0);
  const box=page.locator('[data-customer-id]').first();const customerId=await box.getAttribute('data-customer-id');
  await box.locator('td').nth(1).click();
@@ -58,10 +61,10 @@ test('Direct presentation entry, Enter, thresholds, editing, persistence, backup
  await page.locator('[data-edit]').click();await page.locator('#customer-amount').fill('50000000');await page.locator('#submit-customer').click();assert.match(await page.locator('#stat-gifts').innerText(),/6\.500\.000/);
  await page.locator('#toggle-tools').click();await page.locator('#edit-conference').click();await page.locator('.tier-row').nth(2).locator('.tier-value').fill('8000000');await page.locator('#conference-form button[type=submit]').click();assert.match(await page.locator('#stat-gifts').innerText(),/8\.000\.000/);
  const csvPromise=page.waitForEvent('download');await page.locator('#export').click();assert.match((await csvPromise).suggestedFilename(),/\.csv$/);
- await page.locator('#header-backup').click();const backupPromise=page.waitForEvent('download');await page.locator('#download-backup').click();const backup=await backupPromise;await page.locator('#restore').setInputFiles(await backup.path());await page.waitForFunction(()=>document.querySelectorAll('#conference-select option').length===4);
+ await page.locator('#backup-dialog').evaluate(dialog=>dialog.showModal());const backupPromise=page.waitForEvent('download');await page.locator('#download-backup').click();const backup=await backupPromise;await page.locator('#restore').setInputFiles(await backup.path());await page.waitForFunction(()=>document.querySelectorAll('#conference-select option').length===4);
  assert.equal(await page.locator('#presentation-rows tr').count(),8);assert.equal(await page.locator('#slide-page,#prev-slide,#next-slide,#auto-slides').count(),0);
  await page.locator('#customer-name').fill('Khách mới');
- await page.locator('#customer-amount').fill('70000000');await page.locator('#customer-advisor').fill('TVV mới');await page.locator('#present').click();await page.locator('#customer-advisor').press('Enter');assert.match(await page.locator('#stat-count').innerText(),/9/);assert.match(await page.locator('#presentation-rows').innerText(),/Khách mới/);await page.locator('#present').click();assert.equal(await page.locator('#presentation').isVisible(),true);
+ await page.locator('#customer-amount').fill('70000000');await page.locator('#customer-advisor').fill('TVV mới');await page.locator('#present').click();await page.locator('#customer-advisor').press('Enter');assert.match(await page.locator('#stat-count').innerText(),/9/);assert.match(await page.locator('#presentation-rows').innerText(),/Khách mới/);assert.equal(await page.locator('.inline-entry').evaluate(el=>{const row=el.getBoundingClientRect(),form=el.closest('form').getBoundingClientRect();return Math.abs(row.bottom-form.bottom)<=2;}),true);await page.locator('#present').click();assert.equal(await page.locator('#presentation').isVisible(),true);
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/mobile.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  page.on('dialog',d=>d.accept());await page.locator('[data-delete]').first().click();assert.match(await page.locator('#stat-count').innerText(),/8/);
  await page.locator('#edit-conference').click();
@@ -76,12 +79,19 @@ test('Direct presentation entry, Enter, thresholds, editing, persistence, backup
 
  assert.equal(await page.locator('#background-dialog').evaluate(el=>Math.abs(el.getBoundingClientRect().width-innerWidth)<2),true);
  await page.locator('#close-background').click();
+ assert.equal(await page.locator('#conference-tools').evaluate(el=>el.classList.contains('is-open')),true);
+ await page.locator('#register').click();
  await page.locator('#background-dialog').waitFor({state:'hidden'});
+ assert.equal(await page.evaluate(()=>!!document.fullscreenElement),true);
+ await page.waitForFunction(()=>document.activeElement===document.querySelector('#customer-name'));
+ await page.locator('#present').click();
+ await page.waitForFunction(()=>!document.fullscreenElement);
+ await page.waitForFunction(()=>!document.fullscreenElement);
  await page.reload();await page.locator('#toggle-tools').click();
  await page.locator('#show-background').click();
  await page.locator('#background-dialog').waitFor({state:'visible'});
  assert.equal(await page.locator('#background-image').evaluate(el=>el.naturalWidth>0),true);
- await page.locator('#close-background').click();
+ await page.locator('#background-dialog').evaluate(dialog=>dialog.close());
  const savedConference=await page.locator('#conference-select').inputValue();
  await page.locator('#create-conference').click();
  assert.equal(await page.locator('#background-preview').isVisible(),false);
@@ -105,13 +115,16 @@ test('Direct presentation entry, Enter, thresholds, editing, persistence, backup
  assert.equal(await page.evaluate(()=>document.elementFromPoint(innerWidth/2,innerHeight/2)?.id),'gift-image');
 
  assert.equal(await page.locator('#gift-dialog').evaluate(el=>Math.abs(el.getBoundingClientRect().width-innerWidth)<2),true);
+ assert.equal(await page.locator('#close-gift').evaluate(button=>{const r=button.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===button;}),true);
  await page.locator('#close-gift').click();
+ assert.equal(await page.locator('#conference-tools').evaluate(el=>el.classList.contains('is-open')),true);
+ await page.locator('#gift-dialog').evaluate(dialog=>dialog.close());
  await page.locator('#gift-dialog').waitFor({state:'hidden'});
  await page.reload();await page.locator('#toggle-tools').click();
  await page.locator('#show-gift').click();
  await page.locator('#gift-dialog').waitFor({state:'visible'});
  assert.equal(await page.locator('#gift-image').evaluate(el=>el.naturalWidth>0),true);
- await page.locator('#close-gift').click();
+ await page.locator('#gift-dialog').evaluate(dialog=>dialog.close());
  const savedGiftConference=await page.locator('#conference-select').inputValue();
  await page.locator('#create-conference').click();
  assert.equal(await page.locator('#gift-preview').isVisible(),false);

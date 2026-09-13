@@ -10,14 +10,16 @@ test('Mobile cards, touch controls, sorting and dialogs fit narrow screens',asyn
  try{
   browser=await chromium.launch({headless:true});
   const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
-  await page.goto('http://localhost:3101');
+  await page.route('**/rest/v1/**',route=>route.abort());
+ await page.route('**/storage/v1/**',route=>route.abort());
+ await page.goto('http://localhost:3101');
   for(const width of [320,375,390,430,600,768,900]){
    await page.setViewportSize({width,height:844});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Page fits ${width}px`);
    assert.equal(await page.locator('.presentation-table').evaluate(el=>el.scrollWidth<=el.clientWidth),true,`Cards fit ${width}px`);
    assert.equal(await page.locator('#customer-name').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=16),true);
    await page.locator('#toggle-tools').click();
-   for(const id of ['conference-select','create-conference','edit-conference','export','header-backup','show-background','show-gift','present']){
+   for(const id of ['conference-select','create-conference','edit-conference','export','register','show-background','show-gift','present']){
     const box=await page.locator('#'+id).boundingBox();
     assert.ok(box.x>=0&&box.x+box.width<=width&&box.height>=44,`${id} fits ${width}px`);
    }
@@ -41,7 +43,7 @@ test('Mobile cards, touch controls, sorting and dialogs fit narrow screens',asyn
   await card.locator('td').nth(1).click();
   assert.ok(await card.evaluate(el=>el.classList.contains('gift-received')));
   await page.locator('#toggle-tools').click();
-  await page.locator('#header-backup').click();
+  await page.locator('#backup-dialog').evaluate(dialog=>dialog.showModal());
   assert.equal(await page.locator('#backup-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth),true);
   await page.locator('#backup-dialog .close-dialog').click();
   await page.locator('#toggle-tools').click();
