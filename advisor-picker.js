@@ -1,12 +1,17 @@
 // Keep group labels in suggestions only; the registration input contains the name.
 const AdvisorPicker = (() => {
  const input=document.querySelector('#customer-advisor');
+ const details=document.createElement('div');
+ details.className='advisor-details';
+ details.innerHTML='<input id="customer-advisor-code" aria-label="Mã TVV" autocomplete="off" placeholder="Mã TVV" maxlength="50"><input id="customer-advisor-group" aria-label="Nhóm TVV" autocomplete="off" placeholder="Nhóm TVV" maxlength="100" readonly>';
+ input.after(details);
+ const groupInput=details.querySelector('#customer-advisor-group');
  const list=document.createElement('div');
  list.id='advisors';list.className='advisor-options';list.setAttribute('role','listbox');
  list.setAttribute('aria-label','Tư vấn viên và nhóm');list.hidden=true;document.body.append(list);
  const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().trim().replace(/\s+/g,' ');
  const directory=(window.ADVISORS||[]).map(a=>({...a,search:normalize(a.name)}));
- let matches=[],active=-1;
+ let matches=[],active=-1,selected=null;
  function close(){list.hidden=true;active=-1;input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');}
  function position(){
   const r=input.getBoundingClientRect(),width=Math.min(Math.max(r.width,350),innerWidth-16);
@@ -23,8 +28,8 @@ const AdvisorPicker = (() => {
   if(!matches.length){close();return;}
   list.hidden=false;input.setAttribute('aria-expanded','true');position();list.scrollTop=0;
  }
- function choose(index){if(!matches[index])return;input.value=matches[index].name;close();}
- input.addEventListener('input',show);input.addEventListener('focus',show);
+ function choose(index){if(!matches[index])return;selected=matches[index];input.value=selected.name;groupInput.value=selected.group||'';close();}
+ input.addEventListener('input',()=>{selected=null;groupInput.value='';show();});input.addEventListener('focus',show);
  input.addEventListener('keydown',e=>{
   if(e.isComposing)return;
   if(e.key==='Escape'){close();return;}
@@ -41,5 +46,8 @@ const AdvisorPicker = (() => {
  document.addEventListener('pointerdown',e=>{if(e.target!==input&&!list.contains(e.target))close();});
  window.addEventListener('resize',()=>{if(!list.hidden)position();});
  document.addEventListener('scroll',()=>{if(!list.hidden)position();},true);
- return {close};
+ function set(name,group=''){input.value=name;groupInput.value=group;selected=directory.find(a=>a.name===name&&(!group||a.group===group))||null;}
+ function reset(){selected=null;groupInput.value='';close();}
+ function value(){return selected&&selected.name===input.value?selected:{name:input.value,group:groupInput.value};}
+ return {close,set,reset,value};
 })();

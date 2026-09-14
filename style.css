@@ -246,6 +246,7 @@ th[aria-sort="ascending"] .sort-arrow,th[aria-sort="descending"] .sort-arrow{opa
 }
 
 .advisor-options{position:fixed;z-index:90;overflow-y:auto;overscroll-behavior:contain;background:#fff;border:1px solid #b8cfe3;border-radius:8px;box-shadow:0 8px 28px #233d5530;padding:4px;color:var(--ink);font-size:14px;text-align:left}.advisor-options [role=option]{padding:12px;min-height:44px;cursor:pointer;line-height:1.5;overflow-wrap:anywhere;border-radius:5px}.advisor-options [role=option]:hover,.advisor-options [aria-selected=true]{background:#e5f1fb;color:#17538b}
+.advisor-details{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}.advisor-details input{width:100%;min-width:0;padding:8px;border:1px solid #d6e3f0;border-radius:5px;background:#fff;color:var(--ink);font-size:11px}.advisor-details input[readonly]{background:#f4f8fc;color:#52708b}
 
 /* Gentle color movement emphasizes totals without moving the digits. */
 #presentation .stat{
@@ -342,9 +343,74 @@ th[aria-sort="ascending"] .sort-arrow,th[aria-sort="descending"] .sort-arrow{opa
 /* Keep gift description, gift value, and advisor equally prominent. */
 .presentation-table tbody td:nth-child(4),
 .presentation-table tbody td:nth-child(5),
-.presentation-table tbody td:nth-child(6){font-size:20px}
+.presentation-table tbody td:nth-child(6){font-size:clamp(22px,1.65vw,30px);line-height:1.35}
 @media(max-width:900px){
  .presentation-table tbody td:nth-child(4),
  .presentation-table tbody td:nth-child(5),
- .presentation-table tbody td:nth-child(6){font-size:15px}
+ .presentation-table tbody td:nth-child(6){font-size:20px}
 }
+@media(max-width:600px){
+ .presentation-table tbody td:nth-child(4),
+ .presentation-table tbody td:nth-child(5),
+ .presentation-table tbody td:nth-child(6){font-size:18px}
+}
+
+/* Reserve only the space needed for the edit and delete controls. */
+.presentation-table th:last-child{width:4%;min-width:58px}
+.presentation-table th:last-child,.presentation-table td:last-child{padding-left:5px;padding-right:5px}
+
+/* Use the customer-name blue consistently across every data column. */
+.presentation-table tbody td:nth-child(3).customer-gradient,
+.presentation-table tbody td:nth-child(4),
+.presentation-table tbody td:nth-child(5),
+.presentation-table tbody td:nth-child(6){color:#263d8b;-webkit-text-fill-color:#263d8b}
+
+/* Highlight the two primary identification fields in the requested colors. */
+.presentation-table tbody td:nth-child(2) .customer-gradient{background:none;color:#d52b35;-webkit-text-fill-color:#d52b35}
+.presentation-table tbody td:nth-child(4){color:#c59100;-webkit-text-fill-color:#c59100}
+
+/* Allocate more of the fixed table width to long gift descriptions. */
+.presentation-table th:nth-child(3){width:12%}
+.presentation-table th:nth-child(4){width:30%}
+.presentation-table th:nth-child(5){width:10%}
+
+/* Keep the reveal control at the outer right edge of the toolbar. */
+.toolbar-toggle{order:2}
+.tools-reveal{order:1}
+.tools-reveal .stage-tools{justify-content:flex-end}
+
+/* Keep every presentation action reachable when the viewport is narrow. */
+#background-dialog .image-tools,#gift-dialog .image-tools{overflow-x:auto;overflow-y:hidden}
+#background-dialog .image-tools,#gift-dialog .image-tools{scrollbar-width:none}
+#background-dialog .image-tools::-webkit-scrollbar,#gift-dialog .image-tools::-webkit-scrollbar{display:none}
+
+/* Compact, glassy presentation controls that blend into the displayed image. */
+#background-dialog .image-tools,#gift-dialog .image-tools{width:max-content;max-width:calc(100vw - 84px);background:transparent;border:0;box-shadow:none}
+#background-dialog .image-tools .stage-tools,#gift-dialog .image-tools .stage-tools{width:max-content;min-width:0;gap:6px;padding:5px 6px;background:linear-gradient(135deg,#062b77e8,#0b5aa9dd);border:1px solid #9ad6ff70;border-radius:9px;box-shadow:0 8px 22px #00194180}
+#background-dialog .image-tools .button,#gift-dialog .image-tools .button,#background-dialog .image-tools select,#gift-dialog .image-tools select{background:#ffffff16;border-color:#b7e4ff80;color:#fff}
+#background-dialog .image-tools .button:hover,#gift-dialog .image-tools .button:hover,#background-dialog .image-tools select:hover,#gift-dialog .image-tools select:hover{background:#ffffff2e}
+#background-dialog .image-tools .primary,#gift-dialog .image-tools .primary{background:#168bd3;border-color:#61c6ff}
+#background-dialog .image-tools select option,#gift-dialog .image-tools select option{color:#233d55;background:#fff}
+
+/* The fullscreen entry dock is a separate table, so mirror the data-column grid. */
+#presentation:fullscreen #fullscreen-entry-dock table{table-layout:fixed}
+#presentation:fullscreen #fullscreen-entry-dock td:nth-child(1){width:4%}
+#presentation:fullscreen #fullscreen-entry-dock td:nth-child(2){width:20%}
+#presentation:fullscreen #fullscreen-entry-dock td:nth-child(3){width:12%}
+#presentation:fullscreen #fullscreen-entry-dock td:nth-child(4){width:30%}
+#presentation:fullscreen #fullscreen-entry-dock td:nth-child(5){width:10%}
+#presentation:fullscreen #fullscreen-entry-dock td:nth-child(6){width:17%}
+#presentation:fullscreen #fullscreen-entry-dock td:nth-child(7){width:4%}
+
+.background-gallery{margin-top:14px;padding:12px;border:1px solid #cbdff1;border-radius:8px;background:#fff}
+.background-gallery-head{display:flex;justify-content:space-between;align-items:center;color:#245d8e;font-size:11px}.background-gallery-head span{color:#607c94;font-size:10px}
+.background-gallery-picker{display:grid;grid-template-columns:32px minmax(0,1fr) 32px;align-items:center;gap:8px;margin-top:9px}.gallery-nav{width:32px;height:32px;border:1px solid #b8d4eb;border-radius:50%;background:#eaf3fc;color:#1e6bb1;font-size:23px;line-height:1;cursor:pointer}.gallery-nav:hover{background:#d9ebfa}
+.background-gallery-frame{position:relative;height:126px;overflow:hidden;border-radius:6px;background:#061e62}.background-gallery-frame>#background-gallery-ghost{position:absolute;z-index:0;top:-6px;right:-6px;width:38%;height:calc(100% + 12px);object-fit:cover;filter:blur(7px) brightness(.62);opacity:.8}.background-gallery-frame>#background-gallery-image{position:absolute;z-index:1;left:50%;width:38%;height:100%;object-fit:contain;transform:translateX(-50%);animation:background-gallery-in .42s ease}.background-gallery-frame span{position:absolute;z-index:2;inset:0;display:grid;place-items:center;color:#607c94;font-size:10px}.background-gallery p{margin:8px 0 0;text-align:center;color:#52708b;font-size:10px}
+@keyframes background-gallery-in{from{opacity:.18;filter:blur(7px)}to{opacity:1;filter:blur(0)}}
+
+/* The gallery replaces the legacy single-image preview. */
+#background-preview{display:none!important}
+
+/* Keep the conference setup dialog scrollable without a visible scrollbar. */
+#conference-dialog{scrollbar-width:none}
+#conference-dialog::-webkit-scrollbar{display:none}
