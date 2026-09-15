@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const {chromium}=require('@playwright/test');
 const {spawn}=require('node:child_process');
-test('Advisor suggestions show groups and save only names on desktop and mobile',async()=>{
+test('Supabase advisor suggestions save names, codes and groups on desktop and mobile',async()=>{
  const server=spawn(process.execPath,['server.js'],{env:{...process.env,PORT:'3103'},stdio:'pipe'});
  await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('error',reject);});
  let browser;
@@ -11,9 +11,14 @@ test('Advisor suggestions show groups and save only names on desktop and mobile'
   for(const viewport of [{width:1440,height:1000},{width:390,height:844}]){
    const page=await browser.newPage({viewport});
    await page.route('**/rest/v1/**',route=>route.abort());
+   const fixture={window:{}};require('node:vm').runInNewContext(require('node:fs').readFileSync('advisors-data.js','utf8'),fixture);
+   const advisors=fixture.window.ADVISORS.map((a,i)=>({full_name:a.name,group_name:a.group,advisor_code:'TVV-'+i}));
+   await page.route('**/api/advisors',route=>route.fulfill({json:advisors.map(a=>({name:a.full_name,code:a.advisor_code,group:a.group_name}))}));
  await page.route('**/storage/v1/**',route=>route.abort());
  await page.goto('http://localhost:3103');
+   await page.waitForFunction(()=>document.querySelector('#customer-advisor + small').textContent==='');
    const input=page.locator('#customer-advisor'),options=page.locator('#advisors [role=option]');
+   assert.equal(await page.locator('#customer-advisor-code, #customer-advisor-group').count(),0);
    await input.focus();
    const directoryLabels=await page.evaluate(()=>ADVISORS.map(a=>a.name+' - '+a.group));
    assert.deepEqual(await options.allTextContents(),directoryLabels);
@@ -34,10 +39,19 @@ test('Advisor suggestions show groups and save only names on desktop and mobile'
    await page.locator('#submit-customer').click();
    const row=page.locator('#presentation-rows tr').filter({hasText:'Khách kiểm tra TVV'});
    assert.equal(await row.locator('td').nth(5).innerText(),'Nguyễn Thị Hoa');
+   const saved=await page.evaluate(()=>cloudPayload(current()).customers.at(-1));
+   assert.equal(saved.advisorGroup,'Nha Trang 4');
+   assert.equal(saved.advisorCode,advisors.find(a=>a.full_name===saved.advisorName&&a.group_name===saved.advisorGroup).advisor_code);
    await page.reload();
    assert.equal(await row.locator('td').nth(5).innerText(),'Nguyễn Thị Hoa');
    await row.locator('[data-edit]').click();
+   assert.equal(await page.evaluate(()=>AdvisorPicker.value().group),'Nha Trang 4');
+   await page.evaluate(()=>{AdvisorPicker.set('Existing advisor','Existing group','TVV-123');document.querySelector('#customer-form').requestSubmit();});
+   assert.equal(await page.evaluate(()=>cloudPayload(current()).customers.at(-1).advisorCode),'TVV-123');
+   await row.locator('[data-edit]').click();
+   assert.equal(await page.evaluate(()=>AdvisorPicker.value().code),'TVV-123');
    await input.fill('nguyen thi hoa');
+   assert.equal(await page.evaluate(()=>AdvisorPicker.value().code),'');
    await input.press('ArrowDown');await input.press('Enter');
    assert.equal(await input.inputValue(),'Nguyễn Thị Hoa');
    assert.equal(await page.locator('#advisors').isVisible(),false);
@@ -48,6 +62,33 @@ test('Advisor suggestions show groups and save only names on desktop and mobile'
    await input.fill('Hoa');
    assert.equal(await page.locator('#advisors').evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight;}),true);
    await page.screenshot({path:'test-results/advisors-'+viewport.width+'.png',fullPage:true});
+   let emptyResponse=true,requests=0;
+   await page.route('**/api/advisors',route=>{
+    requests++;
+    return route.fulfill({json:emptyResponse?[]:[{name:'Hoàng Huyền Trang',group:'Sao Mai',code:'TEST-TRANG'}]});
+   });
+   await page.reload();
+   await page.waitForFunction(()=>document.querySelector('#customer-advisor + small').textContent==='');
+   await input.focus();
+   await page.waitForFunction(()=>document.querySelector('#customer-advisor + small').textContent==='');
+   assert.equal(await page.getByText('Chưa có TVV trong danh sách.',{exact:true}).count(),0);
+   emptyResponse=false;
+   const requestsBeforeTyping=requests;
+   await input.pressSequentially('hoang huyen trang');
+   assert.equal(requests,requestsBeforeTyping);
+   assert.equal(await page.getByRole('button',{name:'Tải lại danh sách TVV',exact:true}).count(),0);
+   const inputBox=await input.boundingBox();
+   await options.first().waitFor({state:'visible'});
+   assert.deepEqual(await input.boundingBox(),inputBox);
+   assert.deepEqual(await options.allTextContents(),['Hoàng Huyền Trang - Sao Mai']);
+   await input.fill('hoàng huyền trang');
+   await options.first().waitFor({state:'visible'});
+   assert.deepEqual(await options.allTextContents(),['Hoàng Huyền Trang - Sao Mai']);
+   await input.fill('HOANG HUYEN TRANG');
+   assert.deepEqual(await options.allTextContents(),['Hoàng Huyền Trang - Sao Mai']);
+   await options.first().click();
+   assert.equal(await page.evaluate(()=>AdvisorPicker.value().code),'TEST-TRANG');
+   assert.equal(await page.evaluate(()=>AdvisorPicker.value().group),'Sao Mai');
    await page.close();
   }
  }finally{if(browser)await browser.close();server.kill();}

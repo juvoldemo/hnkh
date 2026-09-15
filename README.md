@@ -1,6 +1,6 @@
 # Hội Ngộ — Quản lý hội nghị khách hàng
 
-Chạy `npm start`, sau đó mở http://localhost:3000. Cần Node.js 18 trở lên, không cần cài thư viện. Hoặc mở trực tiếp `index.html` trong trình duyệt hiện đại.
+Chạy `npm start`, sau đó mở http://localhost:3000. Cần Node.js 18 trở lên, không cần cài thư viện. Nếu mở giao diện bằng Live Server trên localhost hoặc 127.0.0.1, trang tự lấy danh sách TVV từ máy chủ Node ở cổng 3000; vẫn cần giữ `npm start` chạy. Không mở trực tiếp `index.html` bằng đường dẫn tệp.
 
 - Tạo và chuyển đổi nhiều hội nghị; chỉnh sửa tên, ngày, địa điểm.
 - Thêm tùy ý các mức quà: ngưỡng phí, điều kiện từ (≥) hoặc trên (>), tên quà và giá trị.

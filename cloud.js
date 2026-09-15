@@ -16,6 +16,17 @@ window.Cloud = (() => {
   }
   return {
     storageKey: 'hoi-ngo-conferences-v1',
+    async advisors() {
+      let response=await fetch('/api/advisors',{signal:AbortSignal.timeout(30000)});
+      // Live Server serves static files only; use the local Node API automatically.
+      if(response.status===404&&['localhost','127.0.0.1'].includes(location.hostname)&&location.port!=='3000'){
+        response=await fetch('http://'+location.hostname+':3000/api/advisors',{signal:AbortSignal.timeout(30000)});
+      }
+      if(!response.ok)throw Error('Chưa tải được danh sách TVV.');
+      const advisors=await response.json();
+      if(!Array.isArray(advisors))throw Error('Danh sách TVV không hợp lệ.');
+      return advisors;
+    },
     list: () => request('/rest/v1/hn_conferences?select=id,payload,revision&order=created_at.asc'),
     save: (conference, revision) => request('/rest/v1/rpc/hn_save_conference', {method:'POST', body:JSON.stringify({conference_id:conference.id, data:conference, expected_revision:revision})}),
     async upload(conferenceId, imageId, file) {

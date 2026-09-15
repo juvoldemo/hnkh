@@ -246,7 +246,6 @@ th[aria-sort="ascending"] .sort-arrow,th[aria-sort="descending"] .sort-arrow{opa
 }
 
 .advisor-options{position:fixed;z-index:90;overflow-y:auto;overscroll-behavior:contain;background:#fff;border:1px solid #b8cfe3;border-radius:8px;box-shadow:0 8px 28px #233d5530;padding:4px;color:var(--ink);font-size:14px;text-align:left}.advisor-options [role=option]{padding:12px;min-height:44px;cursor:pointer;line-height:1.5;overflow-wrap:anywhere;border-radius:5px}.advisor-options [role=option]:hover,.advisor-options [aria-selected=true]{background:#e5f1fb;color:#17538b}
-.advisor-details{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}.advisor-details input{width:100%;min-width:0;padding:8px;border:1px solid #d6e3f0;border-radius:5px;background:#fff;color:var(--ink);font-size:11px}.advisor-details input[readonly]{background:#f4f8fc;color:#52708b}
 
 /* Gentle color movement emphasizes totals without moving the digits. */
 #presentation .stat{
