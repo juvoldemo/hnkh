@@ -17,9 +17,11 @@ test('Mobile cards, touch controls, sorting and dialogs fit narrow screens',asyn
    await page.setViewportSize({width,height:844});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Page fits ${width}px`);
    assert.equal(await page.locator('.presentation-table').evaluate(el=>el.scrollWidth<=el.clientWidth),true,`Cards fit ${width}px`);
-   assert.equal(await page.locator('#customer-name').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=16),true);
+   assert.equal(await page.locator('#customer-name').isVisible(),false);
+   assert.equal(await page.locator('#register').isVisible(),false);
+   assert.equal(await page.locator('[data-edit]').first().isVisible(),false);
    await page.locator('#toggle-tools').click();
-   for(const id of ['conference-select','create-conference','edit-conference','export','register','show-background','show-gift','present']){
+   for(const id of ['conference-select','create-conference','edit-conference','export','show-background','show-gift','present']){
     const box=await page.locator('#'+id).boundingBox();
     assert.ok(box.x>=0&&box.x+box.width<=width&&box.height>=44,`${id} fits ${width}px`);
    }
@@ -31,15 +33,7 @@ test('Mobile cards, touch controls, sorting and dialogs fit narrow screens',asyn
   await page.setViewportSize({width:390,height:844});
   await page.locator('#mobile-sort').selectOption('amount:-1');
   assert.equal(await page.locator('#presentation-rows tr').first().locator('td').nth(2).innerText(),'70.000.000');
-  await page.locator('#customer-name').fill('Khách hàng có họ và tên rất dài để kiểm tra xuống dòng trên điện thoại');
-  await page.locator('#customer-amount').fill('999999999999999');
-  await page.locator('#customer-advisor').fill('Tư vấn viên có họ và tên dài');
-  await page.locator('#submit-customer').click();
-  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   const card=page.locator('#presentation-rows tr').first();
-  await card.locator('[data-edit]').click();
-  await page.locator('#customer-amount').fill('80000000');
-  await page.locator('#submit-customer').click();
   await card.locator('td').nth(1).click();
   assert.ok(await card.evaluate(el=>el.classList.contains('gift-received')));
   await page.locator('#toggle-tools').click();
@@ -51,9 +45,8 @@ test('Mobile cards, touch controls, sorting and dialogs fit narrow screens',asyn
   await page.screenshot({path:'test-results/mobile-responsive.png'});
   await page.setViewportSize({width:844,height:390});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  await page.locator('#customer-name').fill('Kiểm tra khi màn hình thấp');
-  await page.locator('#customer-advisor').fill('Tư vấn viên');
-  await page.locator('#customer-amount').fill('20000000');
-  await page.locator('#submit-customer').click();
+  assert.equal(await page.locator('#customer-name').isVisible(),false);
+  await page.setViewportSize({width:1440,height:1000});
+  assert.equal(await page.locator('#customer-name').isVisible(),true);
  }finally{if(browser)await browser.close();server.kill();}
 });

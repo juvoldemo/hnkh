@@ -2,13 +2,13 @@
 const assert=require('node:assert/strict');
 const {chromium}=require('@playwright/test');
 const {spawn}=require('node:child_process');
-test('Excel advisor suggestions save names, codes and groups on desktop and mobile',async()=>{
+test('Excel advisor suggestions save names, codes and groups on desktop',async()=>{
  const server=spawn(process.execPath,['server.js'],{env:{...process.env,PORT:'3103'},stdio:'pipe'});
  await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('error',reject);});
  let browser;
  try{
   browser=await chromium.launch({headless:true});
-  for(const viewport of [{width:1440,height:1000},{width:390,height:844}]){
+  for(const viewport of [{width:1440,height:1000}]){
    const page=await browser.newPage({viewport});
    let advisorRequests=0;
    await page.route('**/api/advisors',route=>{advisorRequests++;return route.abort();});

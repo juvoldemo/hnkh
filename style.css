@@ -196,7 +196,7 @@ th[aria-sort="ascending"] .sort-arrow,th[aria-sort="descending"] .sort-arrow{opa
  .presentation-table tbody tr.gift-received::after{content:'✓ Đã tặng quà';grid-column:1/-1;color:#785d16;font-size:12px}
  .presentation-table tbody tr:has(.stage-empty){grid-column:1/-1}
  .presentation-table tbody .stage-empty{padding:24px 0;font-size:14px}
- .presentation-table tfoot{display:block;margin-bottom:20px}
+ #customer-form tfoot,#fullscreen-entry-dock,#register,[data-edit],#advisors{display:none!important}
  .presentation-table .inline-entry{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:16px;border:1px solid #cbdff1;border-radius:12px}
  .presentation-table .inline-entry td{display:block;position:static;width:auto;min-width:0;padding:0;border:0;background:none;box-shadow:none;white-space:normal;font-size:14px}
  .presentation-table .inline-entry #entry-index{grid-column:1/-1;font-size:18px;color:var(--green)}
