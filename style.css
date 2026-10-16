@@ -413,3 +413,6 @@ th[aria-sort="ascending"] .sort-arrow,th[aria-sort="descending"] .sort-arrow{opa
 /* Keep the conference setup dialog scrollable without a visible scrollbar. */
 #conference-dialog{scrollbar-width:none}
 #conference-dialog::-webkit-scrollbar{display:none}
+
+#presentation.has-registration-background{background-image:var(--registration-background);background-size:cover;background-position:center;background-repeat:no-repeat;background-attachment:fixed;min-height:100vh}
+#registration-background-preview{display:block;max-width:100%;max-height:180px;object-fit:contain;margin:12px 0;border-radius:8px}
