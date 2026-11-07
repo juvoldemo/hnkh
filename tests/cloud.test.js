@@ -1,3 +1,4 @@
+const {preparePage}=require('./browser-fixture');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {chromium}=require('@playwright/test');
@@ -30,7 +31,7 @@ test('Default conference uploads both images and a fresh device can display them
     assert.ok(images.has(key));
     return route.fulfill({contentType:'image/png',body:images.get(key)});
    });
-   const page=await context.newPage();await page.goto('http://localhost:3104');
+   const page=await context.newPage();await preparePage(page);await page.goto('http://localhost:3104');
    await page.waitForFunction(()=>document.querySelector('#save-status').textContent.startsWith('Đã lưu lên Supabase'));
    return page;
   }
@@ -38,7 +39,7 @@ test('Default conference uploads both images and a fresh device can display them
   await first.locator('#toggle-tools').click();await first.locator('#edit-conference').click();
   for(const kind of ['background','gift']){
    await first.locator('#'+kind+'-upload').setInputFiles('logo.png');
-   await first.locator('#'+kind+'-preview').waitFor({state:'visible'});
+   await first.waitForFunction(kind=>document.querySelector('#'+kind+'-preview').naturalWidth>0,kind);
   }
   await first.locator('#conference-form button[type=submit]').click();
   await first.locator('#conference-dialog').waitFor({state:'hidden'});
@@ -81,7 +82,7 @@ test('Supabase: migrate local images, persist customers, reload on another devic
    }
    throw Error('Unexpected request '+url);
   });
-  const page=await context.newPage();await page.goto('http://localhost:3102');
+  const page=await context.newPage();await preparePage(page);await page.goto('http://localhost:3102');
   assert.equal(await page.locator('#cloud-email,#cloud-password,#cloud-login').count(),0);
   await page.evaluate(async({conference})=>{
    localStorage.setItem('hoi-ngo-conferences-v1',JSON.stringify({active:conference.id,conferences:[conference]}));
@@ -90,12 +91,12 @@ test('Supabase: migrate local images, persist customers, reload on another devic
   },{conference});
   await page.reload();await page.waitForFunction(()=>document.querySelector('#save-status').textContent.startsWith('Đã lưu lên Supabase'));
   assert.equal(uploads,2);assert.equal(rows[0].payload.demo,false);assert.match(rows[0].payload.giftImageId,/^supabase:shared\//);assert.match(rows[0].payload.backgroundId,/^supabase:shared\//);
-  await page.locator('#customer-name').fill('Nguyễn An');await page.locator('#customer-advisor').fill('TVV');await page.locator('#customer-amount').fill('20000000');await page.locator('#submit-customer').click();
+  await page.locator('#customer-name').fill('Nguyễn An');await page.locator('#customer-advisor').fill('TVV');await page.locator('#customer-amount').fill('20');await page.locator('#submit-customer').click();
   await page.waitForFunction(()=>document.querySelector('#save-status').textContent.startsWith('Đã lưu lên Supabase'));
-  assert.equal(rows[0].payload.customers[0].name,'Nguyễn An');
+  assert.equal(rows[0].payload.customers[0].name,'NGUYỄN AN');
   await page.evaluate(()=>localStorage.clear());await page.reload();
   await page.waitForFunction(()=>document.querySelector('#presentation-title').textContent==='Cloud conference');
-  assert.match(await page.locator('#presentation-rows').innerText(),/Nguyễn An/);
+  assert.match(await page.locator('#presentation-rows').innerText(),/NGUYỄN AN/);
   conflict=true;await page.locator('[data-customer-id]').click();
   await page.waitForFunction(()=>document.querySelector('#save-status').textContent.startsWith('Chưa lưu lên Supabase'));
   assert.equal(rows[0].payload.customers[0].giftReceived,undefined);

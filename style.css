@@ -416,3 +416,13 @@ th[aria-sort="ascending"] .sort-arrow,th[aria-sort="descending"] .sort-arrow{opa
 
 #presentation.has-registration-background{background-image:var(--registration-background);background-size:cover;background-position:center;background-repeat:no-repeat;background-attachment:fixed;min-height:100vh}
 #registration-background-preview{display:block;max-width:100%;max-height:180px;object-fit:contain;margin:12px 0;border-radius:8px}
+#login-screen{min-height:100dvh;display:grid;place-items:center;padding:24px;box-sizing:border-box}
+#login-screen[hidden],#presentation[hidden]{display:none}
+#login-form{width:min(100%,380px);box-sizing:border-box;padding:32px;background:white;border:1px solid var(--line);border-radius:12px;color:var(--ink)}
+#login-form h1{font-size:24px;margin:0 0 24px}
+#login-form label{display:grid;gap:8px;font-size:14px;text-transform:none;letter-spacing:normal}
+#login-form input{width:100%;box-sizing:border-box;min-height:44px;font-size:16px;background:white}
+#login-form button{min-height:44px;font-size:14px;width:100%}
+#login-message{font-size:14px;min-height:20px;color:#b42318}
+#admin-update{flex-shrink:0;min-height:44px;font-size:14px}
+#admin-update[hidden]{display:none!important}

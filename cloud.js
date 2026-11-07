@@ -4,11 +4,11 @@ window.Cloud = (() => {
   async function request(path, options = {}) {
     const response = await fetch(config.url + path, {...options, signal: AbortSignal.timeout(30000), headers: {
       apikey: config.anonKey, Authorization: 'Bearer ' + config.anonKey,
-      'Content-Type': 'application/json', ...options.headers
+      'Content-Type': 'application/json', 'x-conference-password': sessionStorage.getItem('hn-password') || '', ...options.headers
     }});
     if (!response.ok) {
-      if (response.status === 409) throw Error('Hội nghị đã thay đổi trên thiết bị khác. Hãy sao lưu bản cục bộ trước khi tải lại bản trên máy chủ.');
-      throw Error('Supabase trả lỗi ' + response.status + '. Kiểm tra cấu hình bảng dữ liệu và quyền truy cập không cần đăng nhập.');
+      if (response.status === 409) throw Object.assign(Error('Hội nghị đã thay đổi trên thiết bị khác.'), {status:409});
+      throw Error('Supabase trả lỗi ' + response.status + '. Kiểm tra cấu hình và quyền truy cập hội nghị.');
     }
     if (options.blob) return response.blob();
     const body = await response.text();
@@ -16,6 +16,7 @@ window.Cloud = (() => {
   }
   return {
     storageKey: 'hoi-ngo-conferences-v1',
+    login: () => request('/rest/v1/rpc/hn_role', {method:'POST', body:'{}'}),
     list: () => request('/rest/v1/hn_conferences?select=id,payload,revision&order=created_at.asc'),
     save: (conference, revision) => request('/rest/v1/rpc/hn_save_conference', {method:'POST', body:JSON.stringify({conference_id:conference.id, data:conference, expected_revision:revision})}),
     async upload(conferenceId, imageId, file) {

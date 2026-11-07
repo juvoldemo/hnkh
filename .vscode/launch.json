@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "HNKH: Chạy và mở trong VS Code",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/server.js",
+      "cwd": "${workspaceFolder}",
+      "env": { "PORT": "3001" },
+      "console": "internalConsole",
+      "serverReadyAction": {
+        "pattern": "Hoi Ngo: http://localhost:3001",
+        "action": "startDebugging",
+        "name": "HNKH: Trình duyệt trong VS Code"
+      }
+    },
+    {
+      "name": "HNKH: Trình duyệt trong VS Code",
+      "type": "editor-browser",
+      "request": "launch",
+      "url": "http://localhost:3001"
+    }
+  ]
+}

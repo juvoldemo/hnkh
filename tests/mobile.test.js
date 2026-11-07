@@ -1,3 +1,4 @@
+const {preparePage}=require('./browser-fixture');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {chromium}=require('@playwright/test');
@@ -12,7 +13,7 @@ test('Mobile cards, touch controls, sorting and dialogs fit narrow screens',asyn
   const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
   await page.route('**/rest/v1/**',route=>route.abort());
  await page.route('**/storage/v1/**',route=>route.abort());
- await page.goto('http://localhost:3101');
+ await preparePage(page);await page.goto('http://localhost:3101');
   for(const width of [320,375,390,430,600,768,900]){
    await page.setViewportSize({width,height:844});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Page fits ${width}px`);

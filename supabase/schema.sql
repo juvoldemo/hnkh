@@ -1,4 +1,24 @@
 -- Run once in the SQL Editor of the supplied Supabase project.
+begin;
+create or replace function public.hn_role()
+returns text language sql stable security definer set search_path = public as $$
+ select case coalesce(nullif(current_setting('request.headers', true), '')::jsonb ->> 'x-conference-password', '')
+  when '1795' then 'admin' when '0000' then 'user' else null end;
+$$;
+revoke all on function public.hn_role() from public;
+grant execute on function public.hn_role() to anon, authenticated;
+
+create or replace function public.hn_login()
+returns boolean language sql stable security definer set search_path = public as $$
+ select public.hn_role() is not null;
+$$;
+revoke all on function public.hn_login() from public;
+grant execute on function public.hn_login() to anon, authenticated;
+
+create or replace function public.hn_open(data jsonb)
+returns boolean language sql stable set search_path = public as $$
+ select coalesce(now() < (((data->>'date')::date + 2)::timestamp at time zone 'Asia/Ho_Chi_Minh'), false);
+$$;
 create table if not exists public.hn_conferences (
   id uuid primary key,
   owner_id uuid references auth.users(id),
@@ -14,16 +34,17 @@ drop policy if exists hn_owner on public.hn_conferences;
 create policy hn_owner on public.hn_conferences for all to authenticated
 using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 revoke all on public.hn_conferences from anon;
-grant select, insert, update on public.hn_conferences to anon;
+grant select on public.hn_conferences to anon;
 drop policy if exists hn_shared on public.hn_conferences;
 create policy hn_shared on public.hn_conferences for all to anon
-using (owner_id is null) with check (owner_id is null);
+using (owner_id is null and public.hn_login()) with check (owner_id is null and public.hn_login());
 grant select, insert, update on public.hn_conferences to authenticated;
 
 create or replace function public.hn_save_conference(conference_id uuid, data jsonb, expected_revision bigint)
-returns bigint language plpgsql security invoker set search_path = public as $$
+returns bigint language plpgsql security definer set search_path = public as $$
 declare next_revision bigint;
 begin
+  if not public.hn_login() then raise exception 'Invalid password'; end if;
   if expected_revision is null or expected_revision < 0 then raise exception 'Invalid revision'; end if;
   if data->>'id' is distinct from conference_id::text or jsonb_typeof(data->'customers') is distinct from 'array' then
     raise exception 'Invalid conference';
@@ -53,11 +74,31 @@ with check (bucket_id = 'conference-images' and (storage.foldername(name))[1] = 
 
 drop policy if exists hn_images_shared on storage.objects;
 create policy hn_images_shared on storage.objects for select to anon
-using (bucket_id = 'conference-images' and (storage.foldername(name))[1] = 'shared');
+using (bucket_id = 'conference-images' and (storage.foldername(name))[1] = 'shared' and public.hn_login());
 drop policy if exists hn_images_shared_insert on storage.objects;
 create policy hn_images_shared_insert on storage.objects for insert to anon
-with check (bucket_id = 'conference-images' and (storage.foldername(name))[1] = 'shared');
+with check (bucket_id = 'conference-images' and (storage.foldername(name))[1] = 'shared' and public.hn_login());
 drop policy if exists hn_images_shared_update on storage.objects;
 create policy hn_images_shared_update on storage.objects for update to anon
-using (bucket_id = 'conference-images' and (storage.foldername(name))[1] = 'shared')
-with check (bucket_id = 'conference-images' and (storage.foldername(name))[1] = 'shared');
+using (bucket_id = 'conference-images' and (storage.foldername(name))[1] = 'shared' and public.hn_login())
+with check (bucket_id = 'conference-images' and (storage.foldername(name))[1] = 'shared' and public.hn_login());
+
+create or replace function public.hn_guard_conference()
+returns trigger language plpgsql set search_path = public as $$
+begin
+ if new.owner_id is null then
+  if not public.hn_login() then raise exception 'Invalid password'; end if;
+  if public.hn_role() <> 'admin' then
+   if not public.hn_open(new.payload) then raise exception 'Conference is closed'; end if;
+   if TG_OP = 'UPDATE' then
+    if not public.hn_open(old.payload) then raise exception 'Conference is closed'; end if;
+   end if;
+  end if;
+ end if;
+ return new;
+end;
+$$;
+drop trigger if exists hn_guard on public.hn_conferences;
+create trigger hn_guard before insert or update on public.hn_conferences
+for each row execute function public.hn_guard_conference();
+commit;

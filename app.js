@@ -1,6 +1,9 @@
 var registrationBackground;
 const $ = s => document.querySelector(s);
 const KEY = Cloud.storageKey;
+let loggedIn=false;
+let isAdmin=false;
+let adminUpdating=false;
 let cloudReady=false, cloudBusy=false, cloudSyncQueued=false;
 const cloudSnapshots=new Map();
 const fmt = n => new Intl.NumberFormat('vi-VN').format(n);
@@ -71,6 +74,7 @@ function renderGiftFilters(){
 }
 $('#gift-filters').onclick=e=>{const b=e.target.closest('[data-gift-filter]');if(b){selectedGift=b.dataset.giftFilter;renderRows();}};
 function toggleGiftReceived(row){
+ if(!isAdmin&&conferenceClosed(current())){toast('Hội nghị đã đóng nhập.');return;}
  if(!row)return;const x=current().customers.find(x=>x.id===row.dataset.customerId);if(!x)return;
  x.giftReceived=x.giftReceived!==true;
  row.classList.toggle('gift-received',x.giftReceived);
@@ -80,6 +84,7 @@ function toggleGiftReceived(row){
 $('#presentation-rows').onkeydown=e=>{if(e.target.matches('tr[data-customer-id]')&&(e.key==='Enter'||e.key===' ')){e.preventDefault();toggleGiftReceived(e.target);}};
 function toast(message) {$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),3600);}
 function requestCloudSync(){
+ if(adminUpdating)return;
  if(!cloudReady)return;
  if(cloudBusy){cloudSyncQueued=true;return;}
  void syncCloud();
@@ -295,17 +300,20 @@ function cloudPayload(c){const {_cloud,...data}=c;return {...data,customers:data
 function markCloudChanges(){
  for(const c of state.conferences){
   const value=JSON.stringify(cloudPayload(c));
-  if(cloudSnapshots.get(c.id)!==value){c._cloud={...c._cloud,dirty:true};cloudSnapshots.set(c.id,value);}
+  if(cloudSnapshots.get(c.id)!==value){c._cloud={...c._cloud,dirty:true,adminDraft:c._cloud?.adminDraft||(isAdmin&&conferenceClosed(c))};cloudSnapshots.set(c.id,value);}
  }
 }
 function cacheCloud(){localStorage.setItem(KEY,JSON.stringify(state));}
-async function syncCloud(){
- if(!cloudReady||cloudBusy)return;
+async function syncCloud(manualId=null,attempt=0){
+ if(!loggedIn||!cloudReady||cloudBusy)return;
  cloudBusy=true;
+ $('#admin-update').disabled=true;
+ let retry=false,success=true;
  $('#save-status').textContent='Đang lưu lên Supabase…';
  try{
   for(const c of state.conferences){
    if(c.demo||!c._cloud?.dirty)continue;
+   if((conferenceClosed(c)||c._cloud.adminDraft)&&(!isAdmin||manualId!==c.id))continue;
    for(const field of ['backgroundId','giftImageId','registrationBackgroundId']){
     const imageId=c[field];
     if(imageId&&!imageId.startsWith('supabase:')){
@@ -316,20 +324,39 @@ async function syncCloud(){
     }
    }
    const data=cloudPayload(c),snapshot=JSON.stringify(data);
-   const revision=await Cloud.save(data,c._cloud?.revision||0);
-   c._cloud={revision,dirty:JSON.stringify(cloudPayload(c))!==snapshot};
+   let revision;
+   try{revision=await Cloud.save(data,c._cloud?.revision||0);}
+   catch(error){
+    if(error.status!==409)throw error;
+    const row=(await Cloud.list()).find(row=>row.id===c.id);
+    if(!row||!c._cloud?.base||row.revision===c._cloud.revision)throw error;
+    const merged=mergeConference(c._cloud.base,cloudPayload(c),row.payload);
+    Object.assign(c,merged);c._cloud={...c._cloud,revision:row.revision,base:structuredClone(row.payload),dirty:true};
+    retry=true;cacheCloud();render();continue;
+   }
+   const dirty=JSON.stringify(cloudPayload(c))!==snapshot;
+   c._cloud={revision,base:data,dirty,adminDraft:dirty&&c._cloud.adminDraft};
    cloudSnapshots.set(c.id,snapshot);
    cacheCloud();
   }
-  $('#save-status').textContent=state.conferences.some(c=>!c.demo&&c._cloud?.dirty)?'Đã lưu trên máy — chờ đồng bộ':'Đã lưu lên Supabase lúc '+new Date().toLocaleTimeString('vi-VN');
+  $('#save-status').textContent=state.conferences.some(c=>!c.demo&&c._cloud?.adminDraft)?'Bản nháp admin trên máy — bấm Cập nhật để gửi':state.conferences.some(c=>!c.demo&&c._cloud?.dirty)?'Đã lưu trên máy — chờ đồng bộ':'Đã lưu lên Supabase lúc '+new Date().toLocaleTimeString('vi-VN');
   $('#cloud-message').textContent='Đã đồng bộ hội nghị, danh sách khách hàng và ảnh.';
  }catch(error){
+  success=false;
   $('#save-status').textContent='Chưa lưu lên Supabase — bản cục bộ được giữ lại';
   $('#cloud-message').textContent=error.message;
- }finally{cloudBusy=false;if(cloudSyncQueued){cloudSyncQueued=false;requestCloudSync();}}
+ }finally{cloudBusy=false;$('#admin-update').disabled=false;}
+ if(retry){
+  if(attempt<3)return syncCloud(manualId,attempt+1);
+  $('#save-status').textContent='Chưa gửi được — dữ liệu thay đổi liên tục, hãy thử lại';return false;
+ }
+ if(cloudSyncQueued){cloudSyncQueued=false;requestCloudSync();}
+ return success;
 }
 async function loadCloud(replace=false){
- if(cloudBusy)return;
+ if(!loggedIn||cloudBusy)return;
+ cloudBusy=true;
+ $('#admin-update').disabled=true;
  cloudReady=false;
  $('#save-status').textContent='Đang tải hội nghị từ Supabase…';
  try{
@@ -338,7 +365,7 @@ async function loadCloud(replace=false){
   const local=replace?[]:state.conferences.filter(c=>!c.demo);
   for(const row of rows){
    const index=local.findIndex(c=>c.id===row.id);
-   const remote={...row.payload,_cloud:{revision:row.revision,dirty:false}};
+   const remote={...row.payload,_cloud:{revision:row.revision,base:structuredClone(row.payload),dirty:false}};
    if(index<0)local.push(remote);
    else if(!local[index]._cloud?.dirty&&local[index]._cloud?.revision)local[index]=remote;
   }
@@ -346,15 +373,71 @@ async function loadCloud(replace=false){
   else if(replace)state=demo();
   cloudSnapshots.clear();
   for(const c of state.conferences)cloudSnapshots.set(c.id,JSON.stringify(cloudPayload(c)));
-  cacheCloud();resetEntry();render();cloudReady=true;
-  await syncCloud();
- }catch(error){$('#save-status').textContent='Chưa kết nối Supabase — đang dùng dữ liệu trên máy';$('#cloud-message').textContent=error.message;}
+  cacheCloud();render();cloudReady=true;
+ }catch(error){$('#save-status').textContent='Chưa kết nối Supabase — đang dùng dữ liệu trên máy';$('#cloud-message').textContent=error.message;}finally{cloudBusy=false;$('#admin-update').disabled=false;}
+ if(cloudReady)await syncCloud();
 }
 $('#cloud-account').onclick=()=>$('#cloud-dialog').showModal();
 $('#cloud-sync').onclick=()=>cloudReady?syncCloud():loadCloud();
 $('#cloud-reload').onclick=()=>{if(confirm('Thay dữ liệu cục bộ bằng bản trên Supabase? Thay đổi chưa đồng bộ sẽ mất. Hãy tải bản sao lưu trước khi tiếp tục.'))void loadCloud(true);};
 // Remember dirty conferences across reloads, including changes made while offline.
 for(const c of state.conferences){if(c.demo&&(c.backgroundId||c.giftImageId||c.registrationBackgroundId)){c.demo=false;c._cloud={...c._cloud,dirty:true};}if(!c._cloud)c._cloud={revision:0,dirty:true};cloudSnapshots.set(c.id,JSON.stringify(cloudPayload(c)));}
-void loadCloud();
+async function login(){
+ const button=$('#login-form button');button.disabled=true;
+ try{
+  const role=await Cloud.login();if(!['user','admin'].includes(role))throw Error('Mật khẩu không đúng.');
+  isAdmin=role==='admin';$('#admin-update').hidden=!isAdmin;
+  loggedIn=true;$('#login-password').value='';$('#login-screen').hidden=true;$('#presentation').hidden=false;$('#presentation').inert=false;await loadCloud();
+ }catch(error){sessionStorage.removeItem('hn-password');$('#login-message').textContent='Không đăng nhập được. Kiểm tra mật khẩu và kết nối máy chủ.';}
+ finally{button.disabled=false;}
+}
+$('#login-heading').textContent='Đăng nhập hội nghị';
+$('#login-label').textContent='Mật khẩu';
+$('#login-submit').textContent='Đăng nhập';
+$('#admin-update').textContent='Cập nhật';
+$('#login-form').onsubmit=e=>{e.preventDefault();sessionStorage.setItem('hn-password',$('#login-password').value);void login();};
+$('#admin-update').onclick=async()=>{
+ if(!isAdmin||cloudBusy||adminUpdating)return;
+ adminUpdating=true;$('#admin-update').disabled=true;
+ try{
+  const id=current().id,form=$('#customer-form');
+  if(editing||['#customer-name','#customer-amount','#customer-advisor'].some(selector=>$(selector).value.trim())){
+   if(!form.reportValidity())return;
+   form.requestSubmit();
+   if($('#customer-name').value.trim())return;
+  }
+  if(!cloudReady){await loadCloud();if(!cloudReady)return;}
+  const saved=await syncCloud(id);
+  if(saved&&!state.conferences.find(c=>c.id===id)?._cloud?.dirty)toast('Đã cập nhật hội nghị lên máy chủ.');
+ }finally{adminUpdating=false;$('#admin-update').disabled=false;}
+};
+if(sessionStorage.getItem('hn-password'))void login();
 window.addEventListener('online',()=>cloudReady?syncCloud():loadCloud());
-setInterval(()=>{if(!cloudReady||state.conferences.some(c=>!c.demo&&c._cloud?.dirty))void(cloudReady?syncCloud():loadCloud());},15000);
+setInterval(()=>{if(loggedIn&&!cloudBusy&&!adminUpdating)void loadCloud();},3000);
+window.addEventListener('focus',()=>{if(loggedIn)void loadCloud();});
+
+function conferenceClosed(c){return !c.demo&&Date.now()>=Date.parse(c.date+'T00:00:00+07:00')+2*86400000;}
+document.addEventListener('submit',e=>{
+ if(!isAdmin&&['customer-form','conference-form'].includes(e.target.id)&&conferenceClosed(current())&&(e.target.id!=='conference-form'||eventEditing)){
+  e.preventDefault();e.stopImmediatePropagation();toast('Hội nghị đã đóng nhập sau ngày bắt đầu + 1 ngày.');
+ }
+},true);
+$('#presentation-rows').addEventListener('click',e=>{if(!isAdmin&&conferenceClosed(current())){e.stopImmediatePropagation();toast('Hội nghị đã đóng nhập.');}},true);
+function mergeConference(base,local,remote){
+ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+ const merge=(b,l,r)=>{
+  if(same(l,b))return r;
+  if(same(r,b)||same(l,r))return l;
+  if(b&&l&&r&&typeof b==='object'&&!Array.isArray(b)){
+   const result={};for(const key of new Set([...Object.keys(b),...Object.keys(l),...Object.keys(r)]))result[key]=merge(b[key],l[key],r[key]);return result;
+  }
+  throw Error('Hai người đang sửa cùng thông tin. Bản nhập trên máy được giữ lại; hãy sao lưu và tải bản máy chủ.');
+ };
+ const result=merge({...base,customers:[]},{...local,customers:[]},{...remote,customers:[]});
+ const b=new Map(base.customers.map(x=>[x.id,x])),l=new Map(local.customers.map(x=>[x.id,x])),r=new Map(remote.customers.map(x=>[x.id,x]));
+ result.customers=[];
+ for(const id of new Set([...b.keys(),...r.keys(),...l.keys()])){
+  const value=merge(b.get(id),l.get(id),r.get(id));if(value)result.customers.push(value);
+ }
+ return result;
+}

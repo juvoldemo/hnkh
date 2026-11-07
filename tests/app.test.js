@@ -1,3 +1,4 @@
+const {preparePage}=require('./browser-fixture');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
@@ -11,7 +12,7 @@ test('Direct presentation entry, Enter, thresholds, editing, persistence, backup
  browser=await chromium.launch({headless:true,executablePath:chromium.executablePath()});const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/rest/v1/**',route=>route.abort());
  await page.route('**/storage/v1/**',route=>route.abort());
- await page.goto('http://localhost:3100');
+ await preparePage(page);await page.goto('http://localhost:3100');
  assert.equal(await page.locator('#toggle-tools').getAttribute('aria-expanded'),'false');
  assert.equal(await page.locator('#create-conference').isVisible(),false);
  await page.locator('#toggle-tools').click();
@@ -52,25 +53,26 @@ test('Direct presentation entry, Enter, thresholds, editing, persistence, backup
  await page.reload();assert.equal(await page.locator('[data-customer-id="'+customerId+'"]').evaluate(el=>el.classList.contains('gift-received')),true);
  await page.locator('[data-customer-id="'+customerId+'"]').click();assert.equal(await page.locator('tr.gift-received').count(),0);
  await page.reload();assert.equal(await page.locator('[data-customer-id="'+customerId+'"]').evaluate(el=>el.classList.contains('gift-received')),false);
- for(const [amount,value] of [['19999999','0'],['20000000','1.300.000'],['34999999','1.300.000'],['35000000','3.000.000'],['300000000','42.500.000']]){await page.locator('#customer-amount').fill(amount);assert.equal(await page.locator('#preview-value').innerText(),value);}
+ for(const [amount,value] of [[19999999,0],[20000000,1300000],[34999999,1300000],[35000000,3000000],[300000000,42500000]])assert.equal(await page.evaluate(amount=>giftFor(amount).value,amount),value);
  await page.locator('#customer-amount').fill('');await page.screenshot({path:'test-results/desktop.png',fullPage:true});
  await page.locator('#toggle-tools').click();await page.locator('#create-conference').click();await page.locator('#event-name').fill('Hội nghị kiểm thử');await page.locator('#event-date').fill('2026-09-20');await page.locator('#event-location').fill('Hà Nội');
  await page.locator('.tier-row').first().locator('select').selectOption('exclusive');
  await page.locator('#conference-form button[type=submit]').click();assert.equal(await page.locator('#presentation-title').innerText(),'Hội nghị kiểm thử');assert.equal(await page.locator('#presentation-subtitle,.stage-list-heading,.presentation-heading .eyebrow').count(),0);
- await page.locator('#customer-name').fill('Nguyễn Văn An');await page.locator('#customer-advisor').fill('Trần Mai');await page.locator('#customer-amount').fill('20000000');assert.equal(await page.locator('#preview-value').innerText(),'0');await page.locator('#customer-amount').fill('20000001');assert.equal(await page.locator('#preview-value').innerText(),'1.300.000');await page.locator('#customer-advisor').press('Enter');
- assert.match(await page.locator('#stat-investment').innerText(),/20\.000\.001/);await page.reload();assert.equal(await page.locator('#presentation-rows tr').count(),1);
- await page.locator('[data-edit]').click();await page.locator('#customer-amount').fill('50000000');await page.locator('#submit-customer').click();assert.match(await page.locator('#stat-gifts').innerText(),/6\.500\.000/);
+ await page.locator('#customer-name').fill('Nguyễn Văn An');await page.locator('#customer-advisor').fill('Trần Mai');await page.locator('#customer-amount').fill('20');assert.equal(await page.locator('#preview-value').innerText(),'0');await page.locator('#customer-amount').fill('21');assert.equal(await page.locator('#preview-value').innerText(),'1.300.000');await page.locator('#customer-advisor').press('Enter');
+ assert.match(await page.locator('#stat-investment').innerText(),/21\.000\.000/);await page.reload();assert.equal(await page.locator('#presentation-rows tr').count(),1);
+ await page.locator('[data-edit]').click();await page.locator('#customer-amount').fill('50');await page.locator('#submit-customer').click();assert.match(await page.locator('#stat-gifts').innerText(),/6\.500\.000/);
  await page.locator('#toggle-tools').click();await page.locator('#edit-conference').click();await page.locator('.tier-row').nth(2).locator('.tier-value').fill('8000000');await page.locator('#conference-form button[type=submit]').click();assert.match(await page.locator('#stat-gifts').innerText(),/8\.000\.000/);
  const xlsxPromise=page.waitForEvent('download');await page.locator('#export').click();const xlsx=await xlsxPromise;assert.match(xlsx.suggestedFilename(),/\.xlsx$/);const xlsxData=await fs.readFile(await xlsx.path());assert.equal(xlsxData.subarray(0,2).toString(),'PK');assert.match(xlsxData.toString('utf8'),/Mã TVV/);assert.match(xlsxData.toString('utf8'),/Thời gian cập nhật/);
  await page.locator('#backup-dialog').evaluate(dialog=>dialog.showModal());const backupPromise=page.waitForEvent('download');await page.locator('#download-backup').click();const backup=await backupPromise;await page.locator('#restore').setInputFiles(await backup.path());await page.waitForFunction(()=>document.querySelectorAll('#conference-select option').length===4);
  assert.equal(await page.locator('#presentation-rows tr').count(),8);assert.equal(await page.locator('#slide-page,#prev-slide,#next-slide,#auto-slides').count(),0);
  await page.locator('#customer-name').fill('Khách mới');
- await page.locator('#customer-amount').fill('70000000');await page.locator('#customer-advisor').fill('TVV mới');await page.locator('#present').click();await page.locator('#customer-advisor').press('Enter');assert.match(await page.locator('#stat-count').innerText(),/9/);assert.match(await page.locator('#presentation-rows').innerText(),/Khách mới/);assert.equal(await page.locator('.inline-entry').evaluate(el=>{const row=el.getBoundingClientRect(),form=el.closest('form').getBoundingClientRect();return Math.abs(row.bottom-form.bottom)<=2;}),true);await page.locator('#present').click();assert.equal(await page.locator('#presentation').isVisible(),true);
+ await page.locator('#customer-amount').fill('70');await page.locator('#customer-advisor').fill('TVV mới');await page.locator('#present').click();await page.locator('#customer-advisor').press('Enter');assert.match(await page.locator('#stat-count').innerText(),/9/);assert.match(await page.locator('#presentation-rows').innerText(),/KHÁCH MỚI/);assert.equal(await page.locator('.inline-entry').evaluate(el=>{const row=el.getBoundingClientRect(),form=el.closest('form').getBoundingClientRect();return Math.abs(row.bottom-form.bottom)<=2;}),true);await page.locator('#present').click();assert.equal(await page.locator('#presentation').isVisible(),true);
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/mobile.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  page.on('dialog',d=>d.accept());await page.locator('[data-delete]').first().click();assert.match(await page.locator('#stat-count').innerText(),/8/);
+ await page.setViewportSize({width:1440,height:1000});
  await page.locator('#edit-conference').click();
  await page.locator('#background-upload').setInputFiles('logo.png');
- await page.locator('#background-preview').waitFor({state:'visible'});
+ await page.waitForFunction(()=>document.querySelector('#background-preview').naturalWidth>0);
  assert.equal(await page.locator('#background-dialog').isVisible(),false);
  await page.locator('#conference-form button[type=submit]').click();
  await page.locator('#show-background').click();
@@ -103,7 +105,7 @@ test('Direct presentation entry, Enter, thresholds, editing, persistence, backup
  assert.equal(await page.locator('#background-dialog').isVisible(),false);
  await page.locator('#conference-select').selectOption(savedConference);
  await page.locator('#edit-conference').click();
- await page.locator('#background-preview').waitFor({state:'visible'});
+ await page.waitForFunction(()=>document.querySelector('#background-preview').naturalWidth>0);
  await page.locator('#conference-dialog .close-dialog').first().click();
  await page.locator('#edit-conference').click();
  await page.locator('#gift-upload').setInputFiles('logo.png');

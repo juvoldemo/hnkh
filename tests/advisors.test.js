@@ -1,3 +1,4 @@
+const {preparePage}=require('./browser-fixture');
 ﻿const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {chromium}=require('@playwright/test');
@@ -16,7 +17,7 @@ test('Excel advisor suggestions save names, codes and groups on desktop',async()
    const fixture={window:{}};require('node:vm').runInNewContext(require('node:fs').readFileSync('advisors-data.js','utf8'),fixture);
    const advisors=fixture.window.ADVISORS.map((a,i)=>({full_name:a.name,group_name:a.group,advisor_code:a.code}));
  await page.route('**/storage/v1/**',route=>route.abort());
- await page.goto('http://localhost:3103');
+ await preparePage(page);await page.goto('http://localhost:3103');
    const input=page.locator('#customer-advisor'),options=page.locator('#advisors [role=option]');
    assert.equal(await page.locator('#customer-advisor-code, #customer-advisor-group').count(),0);
    await input.focus();
@@ -35,9 +36,9 @@ test('Excel advisor suggestions save names, codes and groups on desktop',async()
    await options.filter({hasText:'Nguyễn Thị Hoa - Nha Trang 4'}).click();
    assert.equal(await input.inputValue(),'Nguyễn Thị Hoa');
    await page.locator('#customer-name').fill('Khách kiểm tra TVV');
-   await page.locator('#customer-amount').fill('20000000');
+   await page.locator('#customer-amount').fill('20');
    await page.locator('#submit-customer').click();
-   const row=page.locator('#presentation-rows tr').filter({hasText:'Khách kiểm tra TVV'});
+   const row=page.locator('#presentation-rows tr').filter({hasText:'KHÁCH KIỂM TRA TVV'});
    assert.equal(await row.locator('td').nth(5).innerText(),'Nguyễn Thị Hoa');
    const saved=await page.evaluate(()=>cloudPayload(current()).customers.at(-1));
    assert.equal(saved.advisorGroup,'Nha Trang 4');
